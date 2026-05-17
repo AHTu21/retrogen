@@ -7,6 +7,13 @@ export type CursorStyle = "default" | "crosshair" | "pointer" | "grab";
 export type UserProfilePrefs = {
   displayName: string;
   contact: string;
+  gender: string;
+  city: string;
+  birthDate: string;
+  /** многострочный список устройств */
+  devices: string;
+  signature: string;
+  notepad: string;
   /** CSS color e.g. #e2e8f0 or transparent */
   boardBackdrop: string;
   /** CSS color overlay for header bar in room */
@@ -19,6 +26,12 @@ export type UserProfilePrefs = {
 const defaultPrefs: UserProfilePrefs = {
   displayName: "",
   contact: "",
+  gender: "",
+  city: "",
+  birthDate: "",
+  devices: "",
+  signature: "",
+  notepad: "",
   boardBackdrop: "",
   headerTint: "",
   cursorStyle: "default",
@@ -33,6 +46,12 @@ export function loadProfilePrefs(): UserProfilePrefs {
     return {
       displayName: typeof p.displayName === "string" ? p.displayName : "",
       contact: typeof p.contact === "string" ? p.contact : "",
+      gender: typeof p.gender === "string" ? p.gender : "",
+      city: typeof p.city === "string" ? p.city : "",
+      birthDate: typeof p.birthDate === "string" ? p.birthDate : "",
+      devices: typeof p.devices === "string" ? p.devices : "",
+      signature: typeof p.signature === "string" ? p.signature : "",
+      notepad: typeof p.notepad === "string" ? p.notepad : "",
       boardBackdrop: typeof p.boardBackdrop === "string" ? p.boardBackdrop : "",
       headerTint: typeof p.headerTint === "string" ? p.headerTint : "",
       cursorStyle:
