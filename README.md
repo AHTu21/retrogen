@@ -32,5 +32,6 @@
 3. `npm run db:deploy`, затем `npm run dev`.
 4. Перед merge в общую ветку дополняйте **`CHANGELOG.md`** (раздел `[Unreleased]`) или:  
    `npm run changelog:append -- "Краткое описание для пользователя"`.
+5. После merge в **`main`** GitHub Actions сам поднимает **2-ю или 3-ю** цифру версии — правила в **[docs/VERSIONING.md](./docs/VERSIONING.md)**. Прод (1-я цифра) — **[docs/ADMIN.md](./docs/ADMIN.md)**.
 
 Удалённый репозиторий (GitHub / GitLab) создаётся у владельца проекта; после `git remote add origin <URL>` — `git push -u origin main`.
