@@ -37,10 +37,14 @@
 - Не полагаться на автоматический bump в `main` для MAJOR — workflow меняет только **MINOR/PATCH**.
 - Не ставить тег `v1.0.0` без обновления changelog и без проверки миграций.
 
+### Тестовый стенд (`staging`)
+
+Перед продом выкладывайте сборку с ветки **`staging`**, обновляя её PR **`main` → `staging`** ([WORKFLOW.md](./WORKFLOW.md)). Версия на стенде = версия в `main` (уже поднятая ботом 2/3 цифры). Отдельного bump на `staging` нет.
+
 ### Позже (когда дойдёте)
 
 - Кнопка **workflow_dispatch** «Release production» в GitHub Actions  
-- Отдельная ветка `release/1.0` или environment **production** с approval  
+- Environment **production** с approval на деплой  
 
 Пока зафиксировано только это руководство; автоматизацию прода добавим отдельно.
 

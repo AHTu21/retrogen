@@ -25,6 +25,7 @@
 ### Разработка
 
 - **Версии:** после merge в `main` CI поднимает **2-ю или 3-ю** цифру по правилам [docs/VERSIONING.md](./docs/VERSIONING.md); прод (**1-я** цифра) — [docs/ADMIN.md](./docs/ADMIN.md).
+- **Процесс:** CI на PR, защита `main`/`staging`, тест через ветку `staging` — [docs/WORKFLOW.md](./docs/WORKFLOW.md), [docs/GITHUB_BRANCH_PROTECTION.md](./docs/GITHUB_BRANCH_PROTECTION.md).
 
 ### API и сервер
 
