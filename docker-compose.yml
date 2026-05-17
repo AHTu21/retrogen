@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: retrogen
+      POSTGRES_PASSWORD: retrogen
+      POSTGRES_DB: retrogen
+    ports:
+      - "5432:5432"
+    volumes:
+      - retrogen_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U retrogen -d retrogen"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://retrogen:retrogen@db:5432/retrogen
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  retrogen_pg:

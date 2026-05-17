@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GlobalRole {
+  user
+  admin
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  displayName  String     @default("")
+  globalRole   GlobalRole @default(user)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  ownedRooms  Room[]       @relation("RoomOwner")
+  memberships RoomMember[]
+}
+
+/** Участник комнаты с ролью (расширяемо: co-facilitator, viewer). */
+model RoomMember {
+  id        String   @id @default(uuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /** facilitator | member | viewer */
+  role      String
+  createdAt DateTime @default(now())
+
+  @@unique([roomId, userId])
+  @@index([userId])
+}
+
+model Room {
+  id              String    @id @default(uuid())
+  slug            String    @unique
+  /** retro — полный набор колонок ретро; empty — только свободный холст (расширяемо). */
+  kind            String    @default("retro")
+  status          String    @default("live")
+  themeRaw        String
+  themeSanitized  String
+  themePackJson   Json
+  createdAt       DateTime  @default(now())
+  endedAt         DateTime?
+  /** Зум, смещение, раскладки блоков/стикеров, мемы — источник правды для синхронизации доски */
+  planeStateJson  Json?
+  planeVersion    Int       @default(0)
+  /** Создатель комнаты (если null — «открытая» комната как раньше, сброс/завершение без проверки владельца). */
+  ownerId         String?
+  owner           User?     @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  /** Показывать ли комнату в общем лобби (GET /api/rooms). */
+  listedInLobby   Boolean   @default(true)
+  /** Bcrypt-хэш пароля для входа в комнату (гости и не-участники); null — без пароля. */
+  joinPasswordHash String?
+
+  blocks            Block[]
+  members           RoomMember[]
+  cards             Card[]
+  sprintStarEntries SprintStarEntry[]
+  sprintStarVotes   SprintStarVote[]
+  retroRatings      RetroRating[]
+  retroOneThings    RetroOneThing[]
+  warmupVotes       WarmupVote[]
+  actionItems       ActionItem[]
+  cardReactions     CardReaction[]
+}
+
+model ActionItem {
+  id        String   @id @default(uuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  text      String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Block {
+  id          String @id @default(uuid())
+  roomId      String
+  room        Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  kind        String
+  sortOrder   Int
+  gridColumns Int    @default(5)
+
+  cards Card[]
+}
+
+model Card {
+  id                String   @id @default(uuid())
+  roomId            String
+  room              Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  blockId           String
+  block             Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  text              String   @default("")
+  anonymous         Boolean  @default(false)
+  authorDisplayName String?
+  row               Int      @default(0)
+  col               Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  reactions         CardReaction[]
+}
+
+/** Реакция на стикер: один участник — не более одной записи на пару (emoji, карточка) */
+model CardReaction {
+  id        String   @id @default(uuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  voterKey  String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([cardId, voterKey, emoji])
+  @@index([roomId])
+  @@index([cardId])
+}
+
+model SprintStarEntry {
+  id        String   @id @default(uuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  name      String
+  photoUrl  String?
+  note      String?
+  starCount Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  votes     SprintStarVote[]
+}
+
+model SprintStarVote {
+  id         String          @id @default(uuid())
+  roomId     String
+  room       Room            @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  entryId    String
+  entry      SprintStarEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  voterKey   String
+  createdAt  DateTime        @default(now())
+
+  @@unique([roomId, voterKey])
+}
+
+model RetroRating {
+  id        String   @id @default(uuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  voterKey  String
+  score     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([roomId, voterKey])
+}
+
+model RetroOneThing {
+  id        String   @id @default(uuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  voterKey  String
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([roomId, voterKey])
+}
+
+model WarmupVote {
+  id        String   @id @default(uuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  optionId  String
+  voterKey  String
+  voterName String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([roomId, voterKey])
+}

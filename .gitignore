@@ -1,0 +1,17 @@
+node_modules
+dist
+.env
+.env.local
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+.vite
+server/prisma/*.db
+server/prisma/*.db-journal
+
+# IDE (личные настройки не коммитим; общие расширения — по желанию)
+.idea/
+.vscode/*
+!.vscode/extensions.json
