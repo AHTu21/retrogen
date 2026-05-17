@@ -1,80 +1,106 @@
 # Настройка защиты веток на GitHub
 
-Владелец репозитория: **https://github.com/AHTu21/retrogen** → **Settings**.
-
-Ниже — пошагово. Сначала **`main`**, затем **`staging`**.
+Репозиторий: **https://github.com/AHTu21/retrogen**
 
 ---
 
-## 1. Ветка `main` (интеграция)
+## Важно: приватный репозиторий на Free
 
-**Settings** → **Rules** → **Rulesets** → **New branch ruleset** (или *Branch protection rules* → Add rule).
+На экране **Rules → Rulesets** GitHub пишет:
+
+> *Rulesets won't be enforced on this private repository until you move to GitHub Team.*
+
+То есть **Rulesets для вашего текущего плана не заработают**. Варианты:
+
+| Вариант | Защита веток | Когда имеет смысл |
+|---------|----------------|------------------|
+| **A. GitHub Pro** (личный, платный) | Классические **Branch protection rules** на private | Оставить repo приватным, минимальная оплата |
+| **B. Organization + Team** | Rulesets + защита | Команда, несколько репо |
+| **C. Public repository** | Rulesets / protection на Free | Если код можно открыть |
+| **D. Без платной защиты** | Только **договорённость + CI** | CI на PR есть, но merge **не блокируется** сервером |
+
+**CI (workflow `build`) у вас уже работает** на каждый PR — красная галочка видна, но без платной защиты GitHub **не запретит** merge при красном CI.
+
+Процесс (PR, staging, версии) описан в [WORKFLOW.md](./WORKFLOW.md) — его соблюдаете вы; технический запрет — только с A/B/C.
+
+---
+
+## Рекомендуемый путь: Branch protection (не Rulesets)
+
+Если есть **GitHub Pro** или репозиторий **public**:
+
+**Settings** → **Branches** (в левом меню, не Rulesets) → **Add branch ruleset** / **Add classic branch protection rule**.
+
+Если пункта **Branches** нет или правила «не enforced» — у вас вариант **D** ниже.
+
+### Правило для `main`
 
 | Поле | Значение |
 |------|----------|
-| Ruleset name | `Protect main` |
-| Enforcement | Active |
-| Target branches | Include default branch **`main`** |
+| Branch name pattern | `main` |
+| Require a pull request before merging | включить |
+| Require status checks to pass | **`build`** |
+| Require branches to be up to date before merging | включить |
+| Do not allow bypassing | по желанию |
+| Allow force pushes | выключить |
+| Allow deletions | выключить |
 
-**Branch rules** — включить:
+### Правило для `staging`
 
-- [x] **Restrict deletions**
-- [x] **Require a pull request before merging**
-  - Required approvals: **0** (или 1, если хотите обязательное ревью)
-  - [x] Require approval of the most recent reviewable push (если approvals ≥ 1)
-- [x] **Require status checks to pass**
-  - Add checks: выберите **`build`** (job из workflow **CI**)
-  - [x] Require branches to be up to date before merging
-- [x] **Block force pushes**
-- [x] **Restrict pushes** (только merge через PR; прямой push в `main` запрещён)
-
-**Save**.
-
-Проверка: `git push origin main` с локального коммита должен быть **отклонён** (если не admin bypass).
-
----
-
-## 2. Ветка `staging` (тестовый стенд)
-
-Отдельный ruleset **`Protect staging`**:
+Второе правило:
 
 | Поле | Значение |
 |------|----------|
-| Target branches | Include by pattern: **`staging`** |
+| Branch name pattern | `staging` |
+| Require a pull request before merging | включить |
+| Require status checks | **`build`** |
+| Force push / delete | запретить |
 
-**Branch rules:**
-
-- [x] **Require a pull request before merging**
-- [x] **Require status checks to pass** → **`build`**
-- [x] **Block force pushes**
-- [x] **Restrict pushes** (фичи не в `staging` напрямую)
-
-**Договорённость в команде** (GitHub не всегда ограничивает base/head):
-
-- PR на `staging` только **`main` → `staging`**
-- Не merge в `staging` «на бегу» с каждой фичей — только после [чеклиста в WORKFLOW.md](./WORKFLOW.md)
-
-Ветка `staging` уже есть на remote. Обновляется **только** merge такого PR.
+PR только **`main` → `staging`** — договорённость в команде ([WORKFLOW.md](./WORKFLOW.md)).
 
 ---
 
-## 3. Labels (опционально, 1 мин)
+## Если Rulesets доступны (Team или public)
 
-**Issues** → **Labels** → New:
+**Settings** → **Rules** → **Rulesets** → **New branch ruleset**:
 
-| Label | Цвет | Смысл |
-|-------|------|--------|
-| `version:minor` | | принудительно minor bump на main |
-| `version:patch` | | принудительно patch |
-| `version:skip` | | не менять версию |
-| `qa-request` | | просьба выкатить на стенд после локальных тестов |
+### `Protect main`
+
+- Target: branch **`main`**
+- Require PR, status check **`build`**, up to date, block force push, restrict pushes
+
+### `Protect staging`
+
+- Target: **`staging`**
+- Require PR, **`build`**, block force push, restrict pushes
 
 ---
 
-## 4. Проверка
+## Вариант D: без платной защиты (ваш случай на Free + private)
 
-1. Ветка `test/rules` → PR в `main` → должен запуститься **Actions → CI**.
-2. Пока CI красный — merge в `main` недоступен (если checks включены).
-3. Сконфликтующий PR — кнопка merge заблокирована до **Resolve conflicts**.
+Сделайте так:
 
-Процесс выкладки на стенд: [WORKFLOW.md](./WORKFLOW.md).
+1. **Не пушить в `main` / `staging` напрямую** — только merge PR (договорённость).
+2. На каждый PR смотреть **Actions → CI** — merge только если зелёный.
+3. Конфликты — GitHub всё равно **не даст merge** при conflicts в PR (это бесплатно).
+4. Code review: второй человек жмёт Approve перед merge.
+5. Выкладка на стенд — только PR `main` → `staging` по [WORKFLOW.md](./WORKFLOW.md).
+
+Позже, когда подключите Pro/Team/public — включите Branch protection по таблицам выше.
+
+---
+
+## Labels
+
+**Issues** → **Labels**:
+
+- `version:minor`, `version:patch`, `version:skip`
+- `qa-request` — готовы выкатить на стенд после локальных тестов
+
+---
+
+## Проверка
+
+1. PR из feature-ветки → в **Checks** есть **CI / build**.
+2. При конфликте — кнопка Merge неактивна (работает и на Free).
+3. Если включили Branch protection — merge без зелёного `build` недоступен.

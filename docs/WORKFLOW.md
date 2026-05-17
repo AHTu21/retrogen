@@ -84,7 +84,8 @@ git push origin "qa/v${VER}"
 | PR `main` → `staging` | То же; base — **текущий** `staging`, head — **main** |
 | Доска (409) | Не git — логика приложения |
 
-Защита веток: [GITHUB_BRANCH_PROTECTION.md](./GITHUB_BRANCH_PROTECTION.md).
+Защита веток: [GITHUB_BRANCH_PROTECTION.md](./GITHUB_BRANCH_PROTECTION.md).  
+На **private + Free** Rulesets не действуют — см. раздел «вариант D» в том файле; конфликты в PR GitHub всё равно блокирует merge.
 
 ---
 
