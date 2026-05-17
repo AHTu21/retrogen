@@ -1,0 +1,35 @@
+# Сборка на каждый PR в main и staging — без зелёной галочки merge блокируется (если включена защита ветки).
+name: CI
+
+on:
+  pull_request:
+    branches: [main, staging]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ci-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate -w server
+
+      - name: Build client
+        run: npm run build -w client
+
+      - name: Build server
+        run: npm run build -w server
