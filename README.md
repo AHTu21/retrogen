@@ -25,6 +25,10 @@
 
 См. **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)**.
 
+## Бизнес и прайс (внутреннее)
+
+Модель монетизации, прайс для B2C/B2B/банков (ВТБ, МТС Банк), план по срокам — **[docs/BUSINESS_MODEL_AND_PRICING.md](./docs/BUSINESS_MODEL_AND_PRICING.md)**.
+
 ## Git и совместная разработка
 
 1. Клонируйте репозиторий, в корне: `npm install`.
