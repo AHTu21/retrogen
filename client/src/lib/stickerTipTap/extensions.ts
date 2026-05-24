@@ -1,4 +1,7 @@
+import Collaboration from "@tiptap/extension-collaboration";
+import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
 import { Color } from "@tiptap/extension-color";
+import type { Doc } from "yjs";
 import FontFamily from "@tiptap/extension-font-family";
 import Highlight from "@tiptap/extension-highlight";
 import HorizontalRule from "@tiptap/extension-horizontal-rule";
@@ -15,15 +18,34 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import Underline from "@tiptap/extension-underline";
 import StarterKit from "@tiptap/starter-kit";
 import { MENTION_CLASS } from "../stickerMentions";
+import type { StickerCollabProvider } from "../stickerCollab/StickerCollabProvider";
 import { StickerMentionNode } from "./mentionExtension";
 
+export type StickerTipTapCollabOptions = {
+  document: Doc;
+  provider: StickerCollabProvider;
+  user: { name: string; color: string };
+};
+
 /** MIT-расширения TipTap для стикера Retrogen. */
-export function createStickerTipTapExtensions() {
+export function createStickerTipTapExtensions(collab?: StickerTipTapCollabOptions) {
   return [
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
       horizontalRule: false,
+      undoRedo: collab ? false : undefined,
     }),
+    ...(collab
+      ? [
+          Collaboration.configure({
+            document: collab.document,
+          }),
+          CollaborationCursor.configure({
+            provider: collab.provider,
+            user: collab.user,
+          }),
+        ]
+      : []),
     Underline,
     Subscript,
     Superscript,

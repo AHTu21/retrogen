@@ -138,3 +138,27 @@ html:is(.corners-rounded, .corners-sharp) :where(
   font-size: 0.88em;
   line-height: 1.35;
 }
+
+/* Совместное редактирование стикера (TipTap CollaborationCursor) */
+.sticker-tiptap .collaboration-cursor__caret {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 2px solid currentColor;
+  pointer-events: none;
+}
+
+.sticker-tiptap .collaboration-cursor__label {
+  position: absolute;
+  top: -1.35em;
+  left: -1px;
+  padding: 1px 4px;
+  border-radius: 3px 3px 3px 0;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: #fff;
+  user-select: none;
+  pointer-events: none;
+}
