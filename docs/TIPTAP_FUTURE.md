@@ -10,12 +10,15 @@
 | Сохранение `getJSON()` + `getHTML()` | ✅ |
 | Batch на сервере | опционально, см. [EPIC_STICKER_JSON.md](./EPIC_STICKER_JSON.md) |
 
-## Ветка: `feature/sticker-collab` (следующий эпик)
+## Совместное редактирование стикера — сделано
 
-| Задача | Зачем |
+| Задача | Статус |
 |--------|--------|
-| Совместное редактирование текста одного стикера | Yjs / TipTap Collaboration — CRDT |
-| Разрешение конфликтов двух курсоров в одной ячейке | Отдельно от `planeLive` (раскладка доски) |
+| Yjs + Socket.IO (`stickerCollab:*`) | ✅ |
+| TipTap Collaboration + курсоры | ✅ |
+| Отдельно от `planeLive` | ✅ |
+
+См. [EPIC_STICKER_COLLAB.md](./EPIC_STICKER_COLLAB.md).
 
 ## Не планируем
 

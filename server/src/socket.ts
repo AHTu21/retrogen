@@ -1,6 +1,7 @@
 import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
 import { roomAccessStatus } from "./roomAccess.js";
+import { registerStickerCollabHandlers } from "./stickerCollabSocket.js";
 
 function reqLikeFromHandshake(socket: {
   handshake: { headers: Record<string, string | string[] | undefined>; auth?: Record<string, unknown> };
@@ -18,6 +19,8 @@ export function attachSocket(httpServer: HttpServer) {
     cors: { origin: true, methods: ["GET", "POST"] },
     path: "/socket.io",
   });
+
+  registerStickerCollabHandlers(io);
 
   io.on("connection", (socket) => {
     socket.on("join", async (slug: string, ack?: (err: Error | null) => void) => {

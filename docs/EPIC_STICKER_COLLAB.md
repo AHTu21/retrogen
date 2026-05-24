@@ -1,7 +1,7 @@
 # Эпик: совместное редактирование одного стикера
 
 **Ветка:** `feature/sticker-collab` (после `feature/sticker-json` желательно)  
-**Статус:** план
+**Статус:** реализовано (Yjs + Socket.IO + TipTap Collaboration)
 
 ## Цель
 
@@ -30,12 +30,12 @@ client → server: stickerCollab:leave { slug, cardId }
 
 ## Фазы
 
-1. [ ] Дизайн ACL (только участники комнаты, не ended)  
-2. [ ] Сервер: join/update/leave + rate limit  
-3. [ ] Клиент: Collaboration + provider при `editingCardId`  
-4. [ ] Конфликт с optimistic `updateCard` / version — одна «истина» через Yjs  
-5. [ ] UI: чужие курсоры, имена  
-6. [ ] Тесты: два браузера, один стикер  
+1. [x] ACL: `roomAccessStatus`, комната не `ended`, карточка в комнате  
+2. [x] Сервер: `stickerCollab:join|update|awareness|leave`, in-memory `Y.Doc`, rate limit  
+3. [x] Клиент: `StickerCollabProvider` + TipTap Collaboration при `editingCardId`  
+4. [x] При collab не перезаписываем редактор из `editDrafts` при входе в edit  
+5. [ ] UI: чужие курсоры — `CollaborationCursor@3.0` несовместим с `@tiptap/extension-collaboration@3.23` (отложено)  
+6. [ ] E2E: два браузера, один стикер (ручной QA)  
 
 ## Риски
 

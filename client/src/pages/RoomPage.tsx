@@ -52,6 +52,8 @@ import { exportStickerCardToPng } from "../lib/stickerPngExport";
 import { StickerConnectionsLayer } from "../components/StickerConnectionsLayer";
 import { StickerTipTapFieldLazy } from "../components/StickerTipTapFieldLazy";
 import type { StickerEditorApi } from "../lib/stickerTipTap/api";
+import { stickerCollabUserColor, stickerCollabUserLabel } from "../lib/stickerCollab/collabUser";
+import { useStickerCollab } from "../lib/stickerCollab/useStickerCollab";
 import { stickerCardEditorContent } from "../lib/stickerTextDoc";
 import {
   buildMentionCandidatesFromRoom,
@@ -3002,6 +3004,25 @@ export function RoomPage() {
     [authMe, guestName],
   );
 
+  const stickerCollabUser = useMemo(
+    () => ({
+      name: stickerCollabUserLabel(actorDisplayName, participantKey),
+      color: stickerCollabUserColor(participantKey || guestName || "local"),
+    }),
+    [actorDisplayName, participantKey, guestName],
+  );
+
+  const stickerCollabProvider = useStickerCollab(
+    socket,
+    slug,
+    editingCardId,
+    editingCardId && socketSessionLive ? stickerCollabUser : null,
+  );
+
+  /** При онлайн-сокете ждём Yjs-провайдер, чтобы не монтировать solo-редактор и не пересоздавать TipTap. */
+  const stickerEditReady = !socketSessionLive || stickerCollabProvider !== null;
+  const stickerEditCollab = Boolean(socketSessionLive && stickerCollabProvider);
+
   const mentionCandidatesLive = useMemo(() => {
     if (!room || !mentionSuggest) return [] as MentionCandidate[];
     return filterMentionCandidates(
@@ -3531,16 +3552,19 @@ export function RoomPage() {
     window.setTimeout(() => {
       const api = editorRefs.current[id];
       if (!api) return;
-      const currentDraft = editDrafts[id] ?? room?.cards.find((c) => c.id === id)?.text ?? "";
-      const normalized = currentDraft?.trim() ? currentDraft : "<p></p>";
-      if (api.getHtml() !== normalized) {
-        api.setHtml(normalized);
+      if (!stickerCollabProvider) {
+        const currentDraft = editDrafts[id] ?? room?.cards.find((c) => c.id === id)?.text ?? "";
+        const normalized = currentDraft?.trim() ? currentDraft : "<p></p>";
+        if (api.getHtml() !== normalized) {
+          api.setHtml(normalized);
+        }
       }
       api.focus();
     }, 0);
     // Синхронизируем DOM и каретку только при входе в режим редактирования, иначе каждое обновление
     // черновика сбрасывало выделение и ломало тулбар/набор текста.
-  }, [editingCardId]);
+    // При Yjs collab содержимое приходит из CRDT, не из editDrafts.
+  }, [editingCardId, stickerCollabProvider]);
 
   useEffect(() => {
     setStickerEditorMono(false);
@@ -5977,9 +6001,25 @@ export function RoomPage() {
                     {editingCardId === c.id ? (
                       <div className="min-h-0 flex-1">
                         <div className={`flex h-full min-h-0 ${justifyClass}`}>
+                          {!stickerEditReady ? (
+                            <div
+                              className="h-full min-h-[2rem] w-full animate-pulse rounded bg-black/5 dark:bg-white/5"
+                              aria-hidden
+                            />
+                          ) : (
                           <StickerTipTapFieldLazy
+                            key={`sticker-edit-${c.id}`}
                             cardId={c.id}
                             initialContent={stickerCardEditorContent(c, editDrafts[c.id])}
+                            collab={
+                              stickerEditCollab && stickerCollabProvider
+                                ? {
+                                    provider: stickerCollabProvider,
+                                    user: stickerCollabUser,
+                                    seedContent: stickerCardEditorContent(c, editDrafts[c.id]),
+                                  }
+                                : undefined
+                            }
                             className={`sticker-editor-scroll h-full w-full overflow-auto whitespace-pre-wrap ${
                               stickerEditorBreakAll ? "break-all" : "break-words"
                             } ${stickerEditorMono ? "font-mono" : ""} ${
@@ -6002,6 +6042,7 @@ export function RoomPage() {
                             onLinkClick={stickerEditorLinkClick}
                             onKeyDown={handleStickerEditorKeyDown}
                           />
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -6240,9 +6281,25 @@ export function RoomPage() {
               {editingCardId === c.id ? (
                 <div className="min-h-0 flex-1">
                   <div className={`flex h-full min-h-0 ${justifyClass}`}>
+                    {!stickerEditReady ? (
+                      <div
+                        className="h-full min-h-[2rem] w-full animate-pulse rounded bg-black/5 dark:bg-white/5"
+                        aria-hidden
+                      />
+                    ) : (
                     <StickerTipTapFieldLazy
+                      key={`sticker-edit-${c.id}`}
                       cardId={c.id}
                       initialContent={stickerCardEditorContent(c, editDrafts[c.id])}
+                      collab={
+                        stickerEditCollab && stickerCollabProvider
+                          ? {
+                              provider: stickerCollabProvider,
+                              user: stickerCollabUser,
+                              seedContent: stickerCardEditorContent(c, editDrafts[c.id]),
+                            }
+                          : undefined
+                      }
                       className={`sticker-editor-scroll h-full w-full overflow-auto whitespace-pre-wrap ${
                         stickerEditorBreakAll ? "break-all" : "break-words"
                       } ${stickerEditorMono ? "font-mono" : ""} ${
@@ -6265,6 +6322,7 @@ export function RoomPage() {
                       onLinkClick={stickerEditorLinkClick}
                       onKeyDown={handleStickerEditorKeyDown}
                     />
+                    )}
                   </div>
                 </div>
               ) : (
