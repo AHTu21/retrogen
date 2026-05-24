@@ -90,3 +90,51 @@ html:is(.corners-rounded, .corners-sharp) :where(
   width: 0;
   height: 0;
 }
+
+/* TipTap в стикере */
+.sticker-tiptap-root,
+.sticker-tiptap-root .tiptap {
+  height: 100%;
+  min-height: 0;
+}
+
+.sticker-tiptap .ProseMirror {
+  outline: none;
+  min-height: 100%;
+  height: 100%;
+  white-space: pre-wrap;
+}
+
+.sticker-tiptap .ProseMirror p {
+  margin: 0;
+}
+
+.sticker-tiptap .ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.sticker-tiptap .ProseMirror td,
+.sticker-tiptap .ProseMirror th {
+  border: 1px solid currentColor;
+  padding: 3px 6px;
+  vertical-align: top;
+}
+
+.sticker-tiptap .ProseMirror blockquote {
+  margin: 0.35em 0;
+  padding-left: 0.75em;
+  border-left: 3px solid currentColor;
+  opacity: 0.9;
+}
+
+.sticker-tiptap .ProseMirror pre {
+  margin: 0.35em 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid currentColor;
+  overflow: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 0.88em;
+  line-height: 1.35;
+}

@@ -1,4 +1,4 @@
-/** Объединение / разъединение ячеек таблицы в contentEditable стикера. */
+/** Объединение / разъединение ячеек таблицы в ProseMirror (после правки — syncFromDom в TipTap). */
 
 export function findStickerTableCell(editor: HTMLElement): HTMLTableCellElement | null {
   const sel = window.getSelection();

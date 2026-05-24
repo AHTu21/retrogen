@@ -82,3 +82,5 @@ npm run version:bump-dry-run
 ## CHANGELOG
 
 Автоматика **не** переносит `[Unreleased]` в релизные секции — по-прежнему вручную (или `npm run changelog:append`). При прод-срезе см. [ADMIN.md](./ADMIN.md).
+
+В `CHANGELOG.md`: **`[Unreleased]`** — черновик для команды (не в «О программе»); готовые релизы — между `<!-- changelog:user -->` и `<!-- changelog:dev -->`; служебные пункты — после `changelog:dev`.

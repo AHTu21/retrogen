@@ -1,12 +1,12 @@
 # Бэклог: редактор стикеров
 
-Живой чеклист. Детали реализации — `PLAN.md` §4, код — `RoomPage.tsx`, `stickerEditorExtras.ts`, `stickerTableCells.ts`, `stickerPngExport.ts` (`html-to-image`).
+Живой чеклист. Детали реализации — `PLAN.md` §4, код — `RoomPage.tsx`, `stickerTipTap/*`, `stickerEditorExtras.ts`, `stickerTableCells.ts`, `stickerPngExport.ts` (`html-to-image`).
 
 **Как вести:** меняйте `[ ]` → `[x]` при merge в `main`; крупные эпики — отдельные PR с ссылкой на этот файл.
 
 ---
 
-## P0 — быстрые улучшения (текущий `contentEditable`)
+## P0 — быстрые улучшения
 
 | Статус | # | Задача |
 |--------|---|--------|
@@ -45,12 +45,12 @@
 
 | Статус | # | Задача |
 |--------|---|--------|
-| [ ] | 9a | Выбор движка (TipTap vs ProseMirror), ADR |
-| [ ] | 9b | PoC: один стикер на TipTap, JSON-схема |
-| [ ] | 9c | Паритет кнопок панели |
-| [ ] | 10 | Миграция HTML → JSON для существующих карточек |
+| [x] | 9a | TipTap (MIT), хранение `Card.text` как HTML |
+| [x] | 9b | Редактор стикера: `StickerTipTapField` + `stickerTipTap/*` |
+| [x] | 9c | Панель форматирования через `runStickerTipTapCommand` |
+| [ ] | 10 | Опционально: JSON-документ вместо HTML / batch-миграция |
 
-Черновик эпика: [TIPTAP_MIGRATION.md](./TIPTAP_MIGRATION.md).
+Черновик эпика: [TIPTAP_MIGRATION.md](./TIPTAP_MIGRATION.md). Вне scope PR: [TIPTAP_FUTURE.md](./TIPTAP_FUTURE.md).
 
 ---
 
@@ -62,3 +62,4 @@
 | 2026-05-24 | P0#1: merge/split ячеек — `stickerTableCells.ts`, кнопки на панели |
 | 2026-05-24 | P0#3: PNG — скачивание + буфер, кнопка **PNG** на панели |
 | 2026-05-24 | P2: @упоминания, теги, связи стикеров (planeState) |
+| 2026-05-19 | P3: TipTap в стикере, кастомная панель, HTML на сервере |

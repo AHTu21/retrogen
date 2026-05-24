@@ -84,8 +84,8 @@ export function RetrogenDockableAbout({ open, onClose, isLight }: Props) {
   const body = (
     <>
       <p className="mb-4 text-sm leading-relaxed opacity-90">
-        Здесь — номер сборки клиента и журнал изменений из файла <span className="font-mono text-xs">CHANGELOG.md</span> репозитория. Окно можно
-        перетаскивать за заголовок, развернуть на весь экран или свернуть кнопкой «−» / Esc.
+        Журнал изменений по версиям — от новых к старым. Окно можно перетаскивать за заголовок, развернуть на весь экран или закрыть кнопкой «−» /
+        Esc.
       </p>
       <ChangelogView source={changelogRaw} />
     </>
