@@ -104,7 +104,7 @@ export function StickerTipTapField({
         onBlur?.(cardId, event as unknown as React.FocusEvent);
       },
     },
-    [collab ? collab.provider : null, cardId],
+    [collab?.provider ?? null, cardId],
   );
 
   useEffect(() => {

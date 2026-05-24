@@ -34,7 +34,7 @@ client → server: stickerCollab:leave { slug, cardId }
 2. [x] Сервер: `stickerCollab:join|update|awareness|leave`, in-memory `Y.Doc`, rate limit  
 3. [x] Клиент: `StickerCollabProvider` + TipTap Collaboration при `editingCardId`  
 4. [x] При collab не перезаписываем редактор из `editDrafts` при входе в edit  
-5. [x] UI: `CollaborationCursor`, цвет по `participantKey`  
+5. [ ] UI: чужие курсоры — `CollaborationCursor@3.0` несовместим с `@tiptap/extension-collaboration@3.23` (отложено)  
 6. [ ] E2E: два браузера, один стикер (ручной QA)  
 
 ## Риски

@@ -1,5 +1,4 @@
 import Collaboration from "@tiptap/extension-collaboration";
-import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
 import { Color } from "@tiptap/extension-color";
 import type { Doc } from "yjs";
 import FontFamily from "@tiptap/extension-font-family";
@@ -33,16 +32,14 @@ export function createStickerTipTapExtensions(collab?: StickerTipTapCollabOption
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
       horizontalRule: false,
+      link: false,
+      underline: false,
       undoRedo: collab ? false : undefined,
     }),
     ...(collab
       ? [
           Collaboration.configure({
             document: collab.document,
-          }),
-          CollaborationCursor.configure({
-            provider: collab.provider,
-            user: collab.user,
           }),
         ]
       : []),

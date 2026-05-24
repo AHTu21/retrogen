@@ -3019,6 +3019,10 @@ export function RoomPage() {
     editingCardId && socketSessionLive ? stickerCollabUser : null,
   );
 
+  /** При онлайн-сокете ждём Yjs-провайдер, чтобы не монтировать solo-редактор и не пересоздавать TipTap. */
+  const stickerEditReady = !socketSessionLive || stickerCollabProvider !== null;
+  const stickerEditCollab = Boolean(socketSessionLive && stickerCollabProvider);
+
   const mentionCandidatesLive = useMemo(() => {
     if (!room || !mentionSuggest) return [] as MentionCandidate[];
     return filterMentionCandidates(
@@ -5997,12 +6001,18 @@ export function RoomPage() {
                     {editingCardId === c.id ? (
                       <div className="min-h-0 flex-1">
                         <div className={`flex h-full min-h-0 ${justifyClass}`}>
+                          {!stickerEditReady ? (
+                            <div
+                              className="h-full min-h-[2rem] w-full animate-pulse rounded bg-black/5 dark:bg-white/5"
+                              aria-hidden
+                            />
+                          ) : (
                           <StickerTipTapFieldLazy
-                            key={`sticker-edit-${c.id}-${stickerCollabProvider ? "collab" : "solo"}`}
+                            key={`sticker-edit-${c.id}`}
                             cardId={c.id}
                             initialContent={stickerCardEditorContent(c, editDrafts[c.id])}
                             collab={
-                              stickerCollabProvider
+                              stickerEditCollab && stickerCollabProvider
                                 ? {
                                     provider: stickerCollabProvider,
                                     user: stickerCollabUser,
@@ -6032,6 +6042,7 @@ export function RoomPage() {
                             onLinkClick={stickerEditorLinkClick}
                             onKeyDown={handleStickerEditorKeyDown}
                           />
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -6270,12 +6281,18 @@ export function RoomPage() {
               {editingCardId === c.id ? (
                 <div className="min-h-0 flex-1">
                   <div className={`flex h-full min-h-0 ${justifyClass}`}>
+                    {!stickerEditReady ? (
+                      <div
+                        className="h-full min-h-[2rem] w-full animate-pulse rounded bg-black/5 dark:bg-white/5"
+                        aria-hidden
+                      />
+                    ) : (
                     <StickerTipTapFieldLazy
-                      key={`sticker-edit-${c.id}-${stickerCollabProvider ? "collab" : "solo"}`}
+                      key={`sticker-edit-${c.id}`}
                       cardId={c.id}
                       initialContent={stickerCardEditorContent(c, editDrafts[c.id])}
                       collab={
-                        stickerCollabProvider
+                        stickerEditCollab && stickerCollabProvider
                           ? {
                               provider: stickerCollabProvider,
                               user: stickerCollabUser,
@@ -6305,6 +6322,7 @@ export function RoomPage() {
                       onLinkClick={stickerEditorLinkClick}
                       onKeyDown={handleStickerEditorKeyDown}
                     />
+                    )}
                   </div>
                 </div>
               ) : (
