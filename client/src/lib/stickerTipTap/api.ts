@@ -1,4 +1,6 @@
+import type { JSONContent } from "@tiptap/core";
 import type { Editor } from "@tiptap/react";
+import { isStickerTextDoc } from "../stickerTextDoc";
 import {
   applyStickerTipTapLink,
   insertStickerTipTapHtml,
@@ -15,7 +17,9 @@ export type StickerEditorApi = {
   focus: () => void;
   blur: () => void;
   getHtml: () => string;
+  getJson: () => JSONContent;
   setHtml: (html: string) => void;
+  setContent: (content: string | JSONContent) => void;
   getDom: () => HTMLElement;
   getEditor: () => Editor;
   runCommand: (command: string, value?: string) => boolean;
@@ -39,8 +43,18 @@ export function createStickerEditorApi(editor: Editor): StickerEditorApi {
       editor.commands.blur();
     },
     getHtml: () => editor.getHTML(),
+    getJson: () => editor.getJSON(),
     setHtml: (html: string) => {
       editor.commands.setContent(html || "<p></p>", { emitUpdate: false });
+    },
+    setContent: (content) => {
+      const next =
+        typeof content === "string"
+          ? content || "<p></p>"
+          : isStickerTextDoc(content)
+            ? content
+            : { type: "doc", content: [{ type: "paragraph" }] };
+      editor.commands.setContent(next, { emitUpdate: false });
     },
     getDom: () => editor.view.dom as HTMLElement,
     getEditor: () => editor,

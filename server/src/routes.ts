@@ -239,6 +239,7 @@ export async function registerRoutes(app: FastifyInstance, io: Server) {
     Params: { slug: string; cardId: string };
     Body: {
       text?: string;
+      textDoc?: unknown | null;
       row?: number;
       col?: number;
       authorDisplayName?: string | null;
@@ -248,6 +249,7 @@ export async function registerRoutes(app: FastifyInstance, io: Server) {
   }>("/api/rooms/:slug/cards/:cardId", { preHandler: roomUnlockPre }, async (req, reply) => {
     const result = await updateCard(req.params.slug, req.params.cardId, {
       text: req.body?.text,
+      textDoc: req.body?.textDoc,
       row: req.body?.row,
       col: req.body?.col,
       authorDisplayName: req.body?.authorDisplayName,
@@ -259,6 +261,8 @@ export async function registerRoutes(app: FastifyInstance, io: Server) {
     if (result.error === "room_ended") return reply.code(409).send({ error: "room_ended" });
     if (result.error === "card_not_found") return reply.code(404).send({ error: "card_not_found" });
     if (result.error === "bad_block") return reply.code(400).send({ error: "bad_block" });
+    if (result.error === "bad_text_doc") return reply.code(400).send({ error: "bad_text_doc" });
+    if (result.error === "text_doc_too_long") return reply.code(400).send({ error: "text_doc_too_long" });
     if (result.error === "conflict") {
       return reply.code(409).send({ error: "conflict", card: result.card });
     }
@@ -617,6 +621,7 @@ function roomDto(room: RoomWith) {
       id: c.id,
       blockId: c.blockId,
       text: c.text,
+      textDoc: c.textDoc ?? null,
       anonymous: c.anonymous,
       authorDisplayName: c.authorDisplayName,
       row: c.row,

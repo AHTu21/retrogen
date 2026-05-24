@@ -119,6 +119,8 @@ export type RoomDto = {
     id: string;
     blockId: string;
     text: string;
+    /** TipTap JSON; null — только HTML в `text` (старые карточки). */
+    textDoc?: unknown | null;
     anonymous: boolean;
     authorDisplayName: string | null;
     row: number;

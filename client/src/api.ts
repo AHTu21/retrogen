@@ -149,6 +149,7 @@ export async function updateCard(
   cardId: string,
   body: {
     text?: string;
+    textDoc?: unknown | null;
     row?: number;
     col?: number;
     authorDisplayName?: string | null;

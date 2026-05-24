@@ -52,6 +52,7 @@ import { exportStickerCardToPng } from "../lib/stickerPngExport";
 import { StickerConnectionsLayer } from "../components/StickerConnectionsLayer";
 import { StickerTipTapFieldLazy } from "../components/StickerTipTapFieldLazy";
 import type { StickerEditorApi } from "../lib/stickerTipTap/api";
+import { stickerCardEditorContent } from "../lib/stickerTextDoc";
 import {
   buildMentionCandidatesFromRoom,
   cardHtmlMentionsMe,
@@ -1935,8 +1936,10 @@ export function RoomPage() {
     if (editingCardId === card.id) applyStickerTagsForCard(card.id);
     const rawDraft = editDrafts[card.id] ?? card.text;
     const nextText = expandEmojiShortcodesInHtml(rawDraft).trim();
+    const nextTextDoc = editorRefs.current[card.id]?.getJson() ?? null;
     const hasContent = htmlToPlainText(nextText).length > 0;
     const prevText = card.text;
+    const prevTextDoc = card.textDoc ?? null;
     const nextAuthor = hasContent ? card.authorDisplayName ?? (guestName.trim() || "Гость") : card.authorDisplayName;
     setRoom((prev) =>
       prev
@@ -1944,7 +1947,12 @@ export function RoomPage() {
             ...prev,
             cards: prev.cards.map((c) =>
               c.id === card.id
-                ? { ...c, text: nextText, authorDisplayName: hasContent ? c.authorDisplayName ?? nextAuthor : c.authorDisplayName }
+                ? {
+                    ...c,
+                    text: nextText,
+                    textDoc: nextTextDoc,
+                    authorDisplayName: hasContent ? c.authorDisplayName ?? nextAuthor : c.authorDisplayName,
+                  }
                 : c,
             ),
           }
@@ -1964,6 +1972,7 @@ export function RoomPage() {
     try {
       const { card: saved } = await updateCard(slug, card.id, {
         text: nextText,
+        textDoc: nextTextDoc,
         authorDisplayName: hasContent ? card.authorDisplayName ?? nextAuthor : card.authorDisplayName,
         expectedUpdatedAt: card.updatedAt,
       });
@@ -1987,7 +1996,12 @@ export function RoomPage() {
       }
       setRoom((prev) =>
         prev
-          ? { ...prev, cards: prev.cards.map((c) => (c.id === card.id ? { ...c, text: prevText } : c)) }
+          ? {
+              ...prev,
+              cards: prev.cards.map((c) =>
+                c.id === card.id ? { ...c, text: prevText, textDoc: prevTextDoc } : c,
+              ),
+            }
           : prev,
       );
     }
@@ -5965,7 +5979,7 @@ export function RoomPage() {
                         <div className={`flex h-full min-h-0 ${justifyClass}`}>
                           <StickerTipTapFieldLazy
                             cardId={c.id}
-                            initialHtml={editDrafts[c.id] ?? c.text ?? ""}
+                            initialContent={stickerCardEditorContent(c, editDrafts[c.id])}
                             className={`sticker-editor-scroll h-full w-full overflow-auto whitespace-pre-wrap ${
                               stickerEditorBreakAll ? "break-all" : "break-words"
                             } ${stickerEditorMono ? "font-mono" : ""} ${
@@ -6228,7 +6242,7 @@ export function RoomPage() {
                   <div className={`flex h-full min-h-0 ${justifyClass}`}>
                     <StickerTipTapFieldLazy
                       cardId={c.id}
-                      initialHtml={editDrafts[c.id] ?? c.text ?? ""}
+                      initialContent={stickerCardEditorContent(c, editDrafts[c.id])}
                       className={`sticker-editor-scroll h-full w-full overflow-auto whitespace-pre-wrap ${
                         stickerEditorBreakAll ? "break-all" : "break-words"
                       } ${stickerEditorMono ? "font-mono" : ""} ${
