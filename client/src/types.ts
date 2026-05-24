@@ -74,6 +74,16 @@ export type PlaneStateDto = {
   /** Цвет фона блока по id блока */
   blockStyles?: Record<string, { backgroundColor?: string }>;
   planeShapes?: PlaneShapeDto[];
+  /** Теги по id карточки (planeState, без миграции БД) */
+  cardTags?: Record<string, string[]>;
+  /** Линии между стикерами на плоскости */
+  connections?: Array<{
+    id: string;
+    fromCardId: string;
+    toCardId: string;
+    label?: string;
+    stroke?: string;
+  }>;
 };
 
 export type RoomDto = {

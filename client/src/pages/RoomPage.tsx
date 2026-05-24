@@ -34,6 +34,38 @@ import { maxLayerZ, minLayerZ } from "../lib/layerZ";
 import { cursorCss, loadProfilePrefs, type UserProfilePrefs } from "../lib/profilePrefs";
 import { contrastRatio } from "../lib/colorContrast";
 import { STICKER_QUICK_EMOJI } from "../lib/stickerEmojiPresets";
+import {
+  cssColorToHex,
+  DEFAULT_STICKER_SURFACE_HEX,
+  expandEmojiShortcodesInHtml,
+  loadRecentStickerEmojis,
+  mergeEmojiPalette,
+  rememberStickerEmoji,
+} from "../lib/stickerEditorExtras";
+import {
+  findStickerTableCell,
+  mergeStickerTableCellDown,
+  mergeStickerTableCellRight,
+  splitStickerTableCellHorizontal,
+  splitStickerTableCellVertical,
+} from "../lib/stickerTableCells";
+import { exportStickerCardToPng } from "../lib/stickerPngExport";
+import { StickerConnectionsLayer } from "../components/StickerConnectionsLayer";
+import {
+  buildMentionCandidatesFromRoom,
+  cardHtmlMentionsMe,
+  currentActorDisplayName,
+  currentActorMentionIds,
+  filterMentionCandidates,
+  getMentionAutocompleteAtCaret,
+  insertMentionInEditor,
+  type MentionCandidate,
+} from "../lib/stickerMentions";
+import {
+  formatStickerTagsForInput,
+  parseStickerTagInput,
+} from "../lib/stickerTags";
+import { newStickerConnectionId, parsePlaneConnections, type StickerConnection } from "../lib/stickerConnections";
 import { planeStateFingerprint } from "../lib/planeFingerprint";
 import { mergePlaneFor409Retry } from "../lib/mergePlane409";
 import { boardPointFromClient, boardViewportCenterWorld, worldSizeFromCssPixels } from "../lib/boardPlaneCoords";
@@ -390,20 +422,6 @@ function htmlToMarkdownLite(html: string): string {
     .trim();
 }
 
-function findStickerTableCell(editor: HTMLElement): HTMLTableCellElement | null {
-  const sel = window.getSelection();
-  if (!sel?.focusNode) return null;
-  let n: Node | null = sel.focusNode;
-  while (n && n !== editor) {
-    if (n.nodeType === Node.ELEMENT_NODE) {
-      const name = (n as HTMLElement).tagName;
-      if (name === "TD" || name === "TH") return n as HTMLTableCellElement;
-    }
-    n = n.parentNode;
-  }
-  return null;
-}
-
 function getGuestName(): string {
   try {
     const v = localStorage.getItem(GUEST_NAME_KEY);
@@ -585,6 +603,19 @@ export function RoomPage() {
   const [copyTipPlacement, setCopyTipPlacement] = useState<null | "header" | "dialog">(null);
   const copyTipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [stickerEmojiOpen, setStickerEmojiOpen] = useState(false);
+  const [stickerRecentEmojis, setStickerRecentEmojis] = useState<string[]>(() => loadRecentStickerEmojis());
+  const [stickerLinkOpen, setStickerLinkOpen] = useState(false);
+  const [stickerLinkHref, setStickerLinkHref] = useState("https://");
+  const [cardTags, setCardTags] = useState<Record<string, string[]>>({});
+  const [stickerConnections, setStickerConnections] = useState<StickerConnection[]>([]);
+  const [mentionSuggest, setMentionSuggest] = useState<{ cardId: string; query: string; pick: number } | null>(
+    null,
+  );
+  const [connectionDraftFrom, setConnectionDraftFrom] = useState<string | null>(null);
+  const [connectionHoverCardId, setConnectionHoverCardId] = useState<string | null>(null);
+  const [stickerFilterMine, setStickerFilterMine] = useState(false);
+  const [stickerTagsDraft, setStickerTagsDraft] = useState("");
+  const stickerLinkInputRef = useRef<HTMLInputElement | null>(null);
   const [toolbarForeColor, setToolbarForeColor] = useState("#0f172a");
   const [toolbarHlColor, setToolbarHlColor] = useState("#fef08a");
   const [boardNowTs, setBoardNowTs] = useState(() => Date.now());
@@ -634,6 +665,8 @@ export function RoomPage() {
     cardStyles: {} as Record<string, { backgroundColor?: string }>,
     blockStyles: {} as Record<string, { backgroundColor?: string }>,
     planeShapes: [] as PlaneShapeDto[],
+    cardTags: {} as Record<string, string[]>,
+    connections: [] as StickerConnection[],
   });
   const suppressNextBoardClickRef = useRef(false);
   const lastBoardPointerWorldRef = useRef<{ x: number; y: number } | null>(null);
@@ -666,7 +699,14 @@ export function RoomPage() {
       if (k.startsWith("tmp-")) continue;
       if (cardIds.has(k)) cardMeta[k] = v;
     }
-    return { ...p, blockLayouts, blockMeta, cardLayouts, cardMeta };
+    const nextTags: Record<string, string[]> = {};
+    for (const [k, v] of Object.entries(p.cardTags ?? {})) {
+      if (cardIds.has(k) && Array.isArray(v) && v.length) nextTags[k] = v;
+    }
+    const nextConn = (p.connections ?? []).filter(
+      (c) => cardIds.has(c.fromCardId) && cardIds.has(c.toCardId) && c.fromCardId !== c.toCardId,
+    );
+    return { ...p, blockLayouts, blockMeta, cardLayouts, cardMeta, cardTags: nextTags, connections: nextConn };
   }
 
   function planeSnapshotHasTmpKeys(s: typeof planeSnapshotRef.current): boolean {
@@ -930,6 +970,23 @@ export function RoomPage() {
     () => contrastRatio(toolbarForeColor, toolbarHlColor),
     [toolbarForeColor, toolbarHlColor],
   );
+
+  const stickerEmojiPalette = useMemo(
+    () => mergeEmojiPalette(stickerRecentEmojis, STICKER_QUICK_EMOJI),
+    [stickerRecentEmojis],
+  );
+
+  const editingStickerBgHex = useMemo(() => {
+    if (!editingCardId) return null;
+    const custom = cssColorToHex(cardStyles[editingCardId]?.backgroundColor);
+    if (custom) return custom;
+    return isLight ? DEFAULT_STICKER_SURFACE_HEX.light : DEFAULT_STICKER_SURFACE_HEX.dark;
+  }, [editingCardId, cardStyles, isLight]);
+
+  const stickerTextOnBgContrast = useMemo(() => {
+    if (!editingStickerBgHex) return null;
+    return contrastRatio(toolbarForeColor, editingStickerBgHex);
+  }, [toolbarForeColor, editingStickerBgHex]);
 
   const blocksSorted = useMemo(() => {
     if (!room) return [];
@@ -1216,6 +1273,20 @@ export function RoomPage() {
         return [...map.values()];
       });
     }
+    if ("cardTags" in ps) {
+      if (ps.cardTags && typeof ps.cardTags === "object") setCardTags((prev) => ({ ...prev, ...ps.cardTags }));
+      else setCardTags({});
+    }
+    if ("connections" in ps) {
+      const incoming = Array.isArray(ps.connections) ? parsePlaneConnections({ connections: ps.connections }) : [];
+      setStickerConnections((prev) => {
+        if (incoming.length === 0 && prev.length > 0) return prev;
+        if (incoming.length === 0) return [];
+        const map = new Map(prev.map((c) => [c.id, c]));
+        for (const c of incoming) map.set(c.id, c);
+        return [...map.values()];
+      });
+    }
   }, []);
 
   function syncPlaneSnapshotFromDto(p: PlaneStateDto) {
@@ -1231,6 +1302,8 @@ export function RoomPage() {
       cardStyles: { ...(p.cardStyles ?? {}) },
       blockStyles: { ...(p.blockStyles ?? {}) },
       planeShapes: (p.planeShapes ?? []).map((s) => ({ ...s })),
+      cardTags: { ...(p.cardTags ?? {}) },
+      connections: (p.connections ?? []).map((c) => ({ ...c })),
     };
   }
 
@@ -1259,8 +1332,24 @@ export function RoomPage() {
       cardStyles,
       blockStyles,
       planeShapes,
+      cardTags,
+      connections: stickerConnections,
     };
-  }, [boardScale, boardOffset, blockLayouts, cardLayouts, blockMeta, cardMeta, memes, gadgets, cardStyles, blockStyles, planeShapes]);
+  }, [
+    boardScale,
+    boardOffset,
+    blockLayouts,
+    cardLayouts,
+    blockMeta,
+    cardMeta,
+    memes,
+    gadgets,
+    cardStyles,
+    blockStyles,
+    planeShapes,
+    cardTags,
+    stickerConnections,
+  ]);
 
   useEffect(() => {
     if (!slug || !room || boardFrozen) return;
@@ -1285,6 +1374,8 @@ export function RoomPage() {
             cardStyles: s.cardStyles,
             blockStyles: s.blockStyles,
             planeShapes: s.planeShapes,
+            cardTags: s.cardTags,
+            connections: s.connections,
           };
         };
 
@@ -1359,6 +1450,8 @@ export function RoomPage() {
     cardStyles,
     blockStyles,
     planeShapes,
+    cardTags,
+    stickerConnections,
     blockLayoutsHydrated,
     cardLayoutsHydrated,
     memesHydrated,
@@ -1846,7 +1939,9 @@ export function RoomPage() {
 
   async function saveCardText(card: RoomDto["cards"][number]) {
     if (!slug || boardFrozen) return;
-    const nextText = (editDrafts[card.id] ?? card.text).trim();
+    if (editingCardId === card.id) applyStickerTagsForCard(card.id);
+    const rawDraft = editDrafts[card.id] ?? card.text;
+    const nextText = expandEmojiShortcodesInHtml(rawDraft).trim();
     const hasContent = htmlToPlainText(nextText).length > 0;
     const prevText = card.text;
     const nextAuthor = hasContent ? card.authorDisplayName ?? (guestName.trim() || "Гость") : card.authorDisplayName;
@@ -2593,6 +2688,8 @@ export function RoomPage() {
   }
 
   function insertStickerEmojiChars(cardId: string, chars: string) {
+    rememberStickerEmoji(chars);
+    setStickerRecentEmojis(loadRecentStickerEmojis());
     pushStickerUndoSnapshot(cardId);
     const editor = editorRefs.current[cardId];
     if (!editor) return;
@@ -2672,34 +2769,71 @@ export function RoomPage() {
     setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
   }
 
-  function insertStickerLink(cardId: string) {
-    const raw = window.prompt("Ссылка (https://…):", "https://");
-    if (raw == null) return;
-    const href = normalizeStickerHttpUrl(raw);
+  function readStickerLinkHrefFromSelection(cardId: string): string {
+    const editor = editorRefs.current[cardId];
+    if (!editor) return "https://";
+    const sel = window.getSelection();
+    if (!sel?.anchorNode || !editor.contains(sel.anchorNode)) return "https://";
+    let node: HTMLElement | null =
+      sel.anchorNode.nodeType === Node.TEXT_NODE
+        ? sel.anchorNode.parentElement
+        : (sel.anchorNode as HTMLElement);
+    const anchor = node?.closest?.("a");
+    if (anchor && editor.contains(anchor)) {
+      return anchor.getAttribute("href") ?? "https://";
+    }
+    return "https://";
+  }
+
+  function openStickerLinkPanel(cardId: string) {
+    setStickerLinkHref(readStickerLinkHrefFromSelection(cardId));
+    setStickerLinkOpen(true);
+    window.setTimeout(() => stickerLinkInputRef.current?.focus(), 0);
+  }
+
+  function applyStickerLink(cardId: string) {
+    const href = normalizeStickerHttpUrl(stickerLinkHref);
     if (!href) {
-      if (raw.trim() !== "") window.alert("Введите корректный http(s) URL.");
+      if (stickerLinkHref.trim() !== "") window.alert("Введите корректный http(s) URL.");
       return;
     }
     pushStickerUndoSnapshot(cardId);
     const editor = editorRefs.current[cardId];
     if (!editor) return;
     editor.focus();
-    try {
-      document.execCommand("styleWithCSS", false, "true");
-    } catch {
-      /* ignore */
+    const sel = window.getSelection();
+    let anchor: HTMLAnchorElement | null = null;
+    if (sel?.anchorNode && editor.contains(sel.anchorNode)) {
+      let node: HTMLElement | null =
+        sel.anchorNode.nodeType === Node.TEXT_NODE
+          ? sel.anchorNode.parentElement
+          : (sel.anchorNode as HTMLElement);
+      const a = node?.closest?.("a");
+      if (a && editor.contains(a)) anchor = a;
     }
-    const ok = document.execCommand("createLink", false, href);
-    if (!ok) {
-      document.execCommand(
-        "insertHTML",
-        false,
-        `<a href="${escapeHtmlAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtmlText(
-          href.replace(/^https?:\/\//i, ""),
-        )}</a>`,
-      );
+    if (anchor) {
+      anchor.href = href;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+    } else {
+      try {
+        document.execCommand("styleWithCSS", false, "true");
+      } catch {
+        /* ignore */
+      }
+      const ok = document.execCommand("createLink", false, href);
+      if (!ok) {
+        document.execCommand(
+          "insertHTML",
+          false,
+          `<a href="${escapeHtmlAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtmlText(
+            href.replace(/^https?:\/\//i, ""),
+          )}</a>`,
+        );
+      }
     }
     setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    setStickerLinkOpen(false);
   }
 
   function unlinkStickerSelection(cardId: string) {
@@ -2931,6 +3065,53 @@ export function RoomPage() {
     setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
   }
 
+  function stickerTableMergeRight(cardId: string) {
+    const editor = editorRefs.current[cardId];
+    if (!editor) return;
+    const cell = findStickerTableCell(editor);
+    const next = cell?.nextElementSibling;
+    if (!cell || !next || (next.tagName !== "TD" && next.tagName !== "TH")) return;
+    pushStickerUndoSnapshot(cardId);
+    mergeStickerTableCellRight(editor);
+    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+  }
+
+  function stickerTableMergeDown(cardId: string) {
+    const editor = editorRefs.current[cardId];
+    if (!editor) return;
+    const cell = findStickerTableCell(editor);
+    const tr = cell?.closest("tr");
+    const table = tr?.closest("table");
+    if (!cell || !tr || !table) return;
+    const rows = table.querySelector("tbody")?.querySelectorAll("tr") ?? table.querySelectorAll("tr");
+    const rowIdx = Array.from(rows).indexOf(tr);
+    const below = rows[rowIdx + 1]?.children[cell.cellIndex] as HTMLElement | undefined;
+    if (!below || (below.tagName !== "TD" && below.tagName !== "TH")) return;
+    pushStickerUndoSnapshot(cardId);
+    mergeStickerTableCellDown(editor);
+    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+  }
+
+  function stickerTableSplitHorizontal(cardId: string) {
+    const editor = editorRefs.current[cardId];
+    if (!editor) return;
+    const cell = findStickerTableCell(editor);
+    if (!cell || cell.colSpan <= 1) return;
+    pushStickerUndoSnapshot(cardId);
+    splitStickerTableCellHorizontal(editor);
+    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+  }
+
+  function stickerTableSplitVertical(cardId: string) {
+    const editor = editorRefs.current[cardId];
+    if (!editor) return;
+    const cell = findStickerTableCell(editor);
+    if (!cell || cell.rowSpan <= 1) return;
+    pushStickerUndoSnapshot(cardId);
+    splitStickerTableCellVertical(editor);
+    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+  }
+
   function insertStickerColumnsBlock(cardId: string, cols: 2 | 3) {
     insertStickerHtml(
       cardId,
@@ -2949,6 +3130,176 @@ export function RoomPage() {
       stickerSaveNoticeTimerRef.current = setTimeout(() => setStickerSaveNotice(null), 2200);
     } catch {
       /* ignore */
+    }
+  }
+
+  const actorMentionIds = useMemo(
+    () => currentActorMentionIds(authMe, guestName),
+    [authMe, guestName],
+  );
+  const actorDisplayName = useMemo(
+    () => currentActorDisplayName(authMe, guestName),
+    [authMe, guestName],
+  );
+
+  const mentionCandidatesLive = useMemo(() => {
+    if (!room || !mentionSuggest) return [] as MentionCandidate[];
+    return filterMentionCandidates(
+      buildMentionCandidatesFromRoom(room, authMe, guestName),
+      mentionSuggest.query,
+    );
+  }, [room, authMe, guestName, mentionSuggest]);
+
+  useEffect(() => {
+    if (!editingCardId) {
+      setStickerTagsDraft("");
+      setMentionSuggest(null);
+      return;
+    }
+    setStickerTagsDraft(formatStickerTagsForInput(cardTags[editingCardId]));
+  }, [editingCardId, cardTags]);
+
+  useEffect(() => {
+    if (!connectionDraftFrom) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setConnectionDraftFrom(null);
+        setConnectionHoverCardId(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [connectionDraftFrom]);
+
+  function cardMatchesMineFilter(card: RoomDto["cards"][number]): boolean {
+    if (!stickerFilterMine) return true;
+    const me = actorDisplayName.trim().toLowerCase();
+    const author = (card.authorDisplayName ?? "").trim().toLowerCase();
+    if (author && author === me) return true;
+    if (cardHtmlMentionsMe(card.text, actorMentionIds)) return true;
+    const draft = editDrafts[card.id];
+    if (draft && cardHtmlMentionsMe(draft, actorMentionIds)) return true;
+    return false;
+  }
+
+  function refreshMentionSuggest(cardId: string) {
+    const editor = editorRefs.current[cardId];
+    if (!editor) {
+      setMentionSuggest(null);
+      return;
+    }
+    const ctx = getMentionAutocompleteAtCaret(editor);
+    if (!ctx) {
+      setMentionSuggest(null);
+      return;
+    }
+    setMentionSuggest({ cardId, query: ctx.query, pick: 0 });
+  }
+
+  function pickMentionCandidate(candidate: MentionCandidate) {
+    if (!mentionSuggest) return;
+    const editor = editorRefs.current[mentionSuggest.cardId];
+    if (!editor) return;
+    const ctx = getMentionAutocompleteAtCaret(editor);
+    if (!ctx) return;
+    insertMentionInEditor(editor, ctx, candidate);
+    setEditDrafts((prev) => ({ ...prev, [mentionSuggest.cardId]: editor.innerHTML ?? "" }));
+    setMentionSuggest(null);
+  }
+
+  function applyStickerTagsForCard(cardId: string) {
+    const tags = parseStickerTagInput(stickerTagsDraft);
+    setCardTags((prev) => {
+      const next = { ...prev };
+      if (tags.length) next[cardId] = tags;
+      else delete next[cardId];
+      return next;
+    });
+  }
+
+  function startConnectionDraft(cardId: string) {
+    setConnectionDraftFrom(cardId);
+    setConnectionHoverCardId(null);
+    setStickerSaveNotice("Кликните второй стикер (Esc — отмена)");
+    if (stickerSaveNoticeTimerRef.current) clearTimeout(stickerSaveNoticeTimerRef.current);
+    stickerSaveNoticeTimerRef.current = setTimeout(() => setStickerSaveNotice(null), 3200);
+  }
+
+  function completeStickerConnection(toCardId: string) {
+    if (!connectionDraftFrom || connectionDraftFrom === toCardId || boardFrozen) return;
+    const dup = stickerConnections.some(
+      (c) =>
+        (c.fromCardId === connectionDraftFrom && c.toCardId === toCardId) ||
+        (c.fromCardId === toCardId && c.toCardId === connectionDraftFrom),
+    );
+    if (!dup) {
+      setStickerConnections((prev) => [
+        ...prev,
+        { id: newStickerConnectionId(), fromCardId: connectionDraftFrom, toCardId },
+      ]);
+    }
+    setConnectionDraftFrom(null);
+    setConnectionHoverCardId(null);
+    setStickerSaveNotice("Связь добавлена");
+    if (stickerSaveNoticeTimerRef.current) clearTimeout(stickerSaveNoticeTimerRef.current);
+    stickerSaveNoticeTimerRef.current = setTimeout(() => setStickerSaveNotice(null), 2200);
+  }
+
+  function removeConnectionsForCard(cardId: string) {
+    setStickerConnections((prev) => prev.filter((c) => c.fromCardId !== cardId && c.toCardId !== cardId));
+  }
+
+  function handleStickerEditorKeyDown(cardId: string, e: React.KeyboardEvent<HTMLDivElement>) {
+    if (mentionSuggest?.cardId === cardId && mentionCandidatesLive.length > 0) {
+      const n = mentionCandidatesLive.length;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setMentionSuggest((s) => (s ? { ...s, pick: (s.pick + 1) % n } : null));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setMentionSuggest((s) => (s ? { ...s, pick: (s.pick - 1 + n) % n } : null));
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        pickMentionCandidate(mentionCandidatesLive[mentionSuggest.pick]!);
+        return;
+      }
+    }
+    if (e.key === "Escape") {
+      if (mentionSuggest?.cardId === cardId) {
+        e.preventDefault();
+        setMentionSuggest(null);
+        return;
+      }
+      e.preventDefault();
+      (e.target as HTMLDivElement | null)?.blur();
+      setEditingCardId(null);
+    }
+  }
+
+  async function exportStickerAsPng(cardId: string) {
+    const editor = editorRefs.current[cardId];
+    const card = editor?.closest("[data-sticker-card='true']");
+    if (!(card instanceof HTMLElement)) return;
+    try {
+      const shortId = cardId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 12) || "sticker";
+      const name = slug ? `retrogen-${slug}-${shortId}.png` : `retrogen-sticker-${shortId}.png`;
+      const { copiedToClipboard } = await exportStickerCardToPng(card, name);
+      setStickerSaveNotice(
+        copiedToClipboard
+          ? "PNG стикера скачан (текст, реакции, автор) и скопирован в буфер"
+          : "PNG стикера скачан (текст, реакции, автор)",
+      );
+      if (stickerSaveNoticeTimerRef.current) clearTimeout(stickerSaveNoticeTimerRef.current);
+      stickerSaveNoticeTimerRef.current = setTimeout(() => setStickerSaveNotice(null), 2800);
+    } catch (err) {
+      console.warn("[sticker PNG export]", err);
+      setStickerSaveNotice("Не удалось экспортировать PNG (см. консоль F12)");
+      if (stickerSaveNoticeTimerRef.current) clearTimeout(stickerSaveNoticeTimerRef.current);
+      stickerSaveNoticeTimerRef.current = setTimeout(() => setStickerSaveNotice(null), 2800);
     }
   }
 
@@ -3111,6 +3462,13 @@ export function RoomPage() {
         delete next[cardId];
         return next;
       });
+      setCardTags((prev) => {
+        if (!(cardId in prev)) return prev;
+        const next = { ...prev };
+        delete next[cardId];
+        return next;
+      });
+      removeConnectionsForCard(cardId);
       setSelectedCardId((prev) => (prev === cardId ? null : prev));
       setContextMenu(null);
       if (cardId.startsWith("tmp-")) {
@@ -3346,6 +3704,7 @@ export function RoomPage() {
     setStickerEditorMono(false);
     setStickerEditorBreakAll(false);
     setStickerEmojiOpen(false);
+    setStickerLinkOpen(false);
   }, [editingCardId]);
 
   useEffect(() => {
@@ -3763,7 +4122,9 @@ export function RoomPage() {
             Рядом с цветами показывается <strong>оценка контраста</strong> между цветом текста и маркера (если ниже ~3∶1 — предупреждение; для реального текста учитывайте и фон стикера).
           </li>
           <li>
-            Кнопка <strong>😊</strong> — быстрая вставка частых эмодзи в позицию курсора.
+            Кнопка <strong>😊</strong> — эмодзи (сначала недавние). При сохранении <code>:smile:</code>, <code>:fire:</code> и др. превращаются в символы.
+            <br />
+            <strong>URL</strong> — строка в панели (без отдельного окна): вставка или правка ссылки по выделению.
           </li>
         </ul>
       </div>
@@ -3809,6 +4170,9 @@ export function RoomPage() {
         <ul className="mt-1 list-disc space-y-1 pl-5">
           <li>
             <strong>MD</strong> — скопировать содержимое стикера в буфер как упрощённый Markdown (таблицы и сложная вёрстка преобразуются грубо).
+          </li>
+          <li>
+            <strong>PNG</strong> — снимок карточки стикера: ваш текст, эмодзи-реакции, имя автора, цвет фона и рамка (как на доске, без панели форматирования).
           </li>
           <li>
             После успешного сохранения стикера на сервер в панели может появиться сообщение «Сохранено на сервере».
@@ -4064,6 +4428,15 @@ export function RoomPage() {
               {rolePreviewMode !== "server" ? (
                 <span className="opacity-80">(только отображение; серверные действия по-прежнему с вашими правами)</span>
               ) : null}
+              <label className="flex cursor-pointer items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={stickerFilterMine}
+                  onChange={(e) => setStickerFilterMine(e.target.checked)}
+                  className="rounded"
+                />
+                <span>Только мои стикеры</span>
+              </label>
             </div>
             {boardFrozen ? (
               <p className={`mt-1 text-sm ${isLight ? "text-amber-800" : "text-amber-300"}`}>Ретро завершено · только просмотр</p>
@@ -4599,12 +4972,55 @@ export function RoomPage() {
               ↷
             </button>
             <span className="mx-0.5 h-5 w-px shrink-0 bg-current opacity-25" aria-hidden />
-            <button type="button" className="border px-1.5 py-0.5 text-[10px]" title="Вставить ссылку" onClick={() => insertStickerLink(editingCardId)}>
+            <button
+              type="button"
+              className={`border px-1.5 py-0.5 text-[10px] ${stickerLinkOpen ? "ring-1 ring-sky-500" : ""}`}
+              title="Вставить или изменить ссылку"
+              onClick={() => openStickerLinkPanel(editingCardId)}
+            >
               URL
             </button>
             <button type="button" className="border px-1.5 py-0.5 text-xs" title="Убрать ссылку" onClick={() => unlinkStickerSelection(editingCardId)}>
               ×сс
             </button>
+            {stickerLinkOpen ? (
+              <div
+                className="flex w-full basis-full flex-wrap items-center gap-1 border-t border-current/10 pt-1"
+                data-sticker-format-toolbar="true"
+                onMouseDownCapture={(e) => e.preventDefault()}
+              >
+                <input
+                  ref={stickerLinkInputRef}
+                  type="url"
+                  className={`min-w-[12rem] flex-1 rounded border px-2 py-0.5 text-xs ${
+                    isLight ? "border-zinc-300 bg-white" : "border-zinc-600 bg-zinc-800"
+                  }`}
+                  value={stickerLinkHref}
+                  placeholder="https://…"
+                  onChange={(e) => setStickerLinkHref(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      applyStickerLink(editingCardId);
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      setStickerLinkOpen(false);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="border px-2 py-0.5 text-xs"
+                  onClick={() => applyStickerLink(editingCardId)}
+                >
+                  OK
+                </button>
+                <button type="button" className="border px-2 py-0.5 text-xs opacity-80" onClick={() => setStickerLinkOpen(false)}>
+                  Отмена
+                </button>
+              </div>
+            ) : null}
             <span className="mx-0.5 h-5 w-px shrink-0 bg-current opacity-25" aria-hidden />
             <button type="button" className="border px-1 py-0.5 text-[10px]" title="Копировать формат выделения" onClick={() => copyStickerFormat(editingCardId)}>
               кФ
@@ -4675,10 +5091,16 @@ export function RoomPage() {
               />
             </label>
             <span
-              className={`text-[10px] tabular-nums ${stickerToolbarContrast != null && stickerToolbarContrast < 3 ? "font-medium text-amber-600" : "opacity-70"}`}
-              title="Ориентировочный контраст между цветами A и Hl (WCAG для крупного текста обычно ≥ 3∶1)"
+              className={`text-[10px] tabular-nums ${
+                (stickerToolbarContrast != null && stickerToolbarContrast < 3) ||
+                (stickerTextOnBgContrast != null && stickerTextOnBgContrast < 3)
+                  ? "font-medium text-amber-600"
+                  : "opacity-70"
+              }`}
+              title="Контраст: A↔Hl и A↔фон стикера (WCAG для крупного текста обычно ≥ 3∶1)"
             >
-              {stickerToolbarContrast != null ? `≈${stickerToolbarContrast.toFixed(1)}∶1` : ""}
+              {stickerToolbarContrast != null ? `Hl≈${stickerToolbarContrast.toFixed(1)}` : ""}
+              {stickerTextOnBgContrast != null ? ` · фон≈${stickerTextOnBgContrast.toFixed(1)}` : ""}
             </span>
             <span className="relative">
               <button
@@ -4698,7 +5120,7 @@ export function RoomPage() {
                   }`}
                   data-sticker-format-toolbar="true"
                 >
-                  {STICKER_QUICK_EMOJI.map((em) => (
+                  {stickerEmojiPalette.map((em) => (
                     <button
                       key={em}
                       type="button"
@@ -4797,6 +5219,38 @@ export function RoomPage() {
             </button>
             <button type="button" className="border px-1 py-0.5 text-[10px]" title="Удалить столбец" onClick={() => stickerTableRemoveColumn(editingCardId)}>
               −стл
+            </button>
+            <button
+              type="button"
+              className="border px-1 py-0.5 text-[10px]"
+              title="Объединить с ячейкой справа"
+              onClick={() => stickerTableMergeRight(editingCardId)}
+            >
+              ⊞→
+            </button>
+            <button
+              type="button"
+              className="border px-1 py-0.5 text-[10px]"
+              title="Объединить с ячейкой снизу"
+              onClick={() => stickerTableMergeDown(editingCardId)}
+            >
+              ⊞↓
+            </button>
+            <button
+              type="button"
+              className="border px-1 py-0.5 text-[10px]"
+              title="Разделить ячейку по горизонтали (colspan)"
+              onClick={() => stickerTableSplitHorizontal(editingCardId)}
+            >
+              ⊟→
+            </button>
+            <button
+              type="button"
+              className="border px-1 py-0.5 text-[10px]"
+              title="Разделить ячейку по вертикали (rowspan)"
+              onClick={() => stickerTableSplitVertical(editingCardId)}
+            >
+              ⊟↓
             </button>
             <button type="button" className="border px-1 py-0.5 text-[10px]" title="Две колонки текста" onClick={() => insertStickerColumnsBlock(editingCardId, 2)}>
               ║2
@@ -4898,6 +5352,49 @@ export function RoomPage() {
               <option value="1">¶1</option>
               <option value="2">¶2</option>
             </select>
+            <input
+              type="text"
+              className={`max-w-[7rem] rounded border px-1 py-0.5 text-[10px] ${isLight ? "border-zinc-300 bg-white" : "border-zinc-600 bg-zinc-800"}`}
+              title="Теги стикера (#идея #блокер)"
+              placeholder="#теги"
+              value={stickerTagsDraft}
+              onChange={(e) => setStickerTagsDraft(e.target.value)}
+              onBlur={() => applyStickerTagsForCard(editingCardId)}
+            />
+            <button
+              type="button"
+              className={`border px-1 py-0.5 text-[10px] ${connectionDraftFrom === editingCardId ? "ring-1 ring-violet-500" : ""}`}
+              title="Связать с другим стикером (клик по второму)"
+              onClick={() => startConnectionDraft(editingCardId)}
+            >
+              ↔
+            </button>
+            {mentionSuggest?.cardId === editingCardId && mentionCandidatesLive.length > 0 ? (
+              <div
+                className={`absolute left-0 top-full z-[1200] mt-1 max-h-40 min-w-[10rem] overflow-y-auto rounded border shadow-lg ${
+                  isLight ? "border-zinc-300 bg-white" : "border-zinc-600 bg-zinc-900"
+                }`}
+                data-sticker-format-toolbar="true"
+              >
+                {mentionCandidatesLive.map((mc, i) => (
+                  <button
+                    key={mc.userId}
+                    type="button"
+                    className={`block w-full px-2 py-1 text-left text-xs ${
+                      i === mentionSuggest.pick
+                        ? "bg-sky-500/25"
+                        : isLight
+                          ? "hover:bg-zinc-100"
+                          : "hover:bg-zinc-800"
+                    }`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => pickMentionCandidate(mc)}
+                  >
+                    @{mc.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <button
               type="button"
               className="border px-1 py-0.5 text-[10px]"
@@ -4905,6 +5402,14 @@ export function RoomPage() {
               onClick={() => void copyStickerAsMarkdown(editingCardId)}
             >
               MD
+            </button>
+            <button
+              type="button"
+              className="border px-1 py-0.5 text-[10px]"
+              title="Скачать карточку стикера как картинку: текст, реакции, имя автора, фон"
+              onClick={() => void exportStickerAsPng(editingCardId)}
+            >
+              PNG
             </button>
           </div>
         )}
@@ -4934,6 +5439,18 @@ export function RoomPage() {
             >
               Цвет фона…
             </button>
+            {contextMenu.kind === "card" ? (
+              <button
+                type="button"
+                className="block w-full px-2 py-1 text-left hover:bg-sky-500/20"
+                onClick={() => {
+                  startConnectionDraft(contextMenu.id);
+                  setContextMenu(null);
+                }}
+              >
+                Связать с другим стикером…
+              </button>
+            ) : null}
             <button type="button" className="block w-full px-2 py-1 text-left hover:bg-sky-500/20" onClick={() => bringToFront(contextMenu.kind, contextMenu.id)}>
               На передний план
             </button>
@@ -5218,6 +5735,17 @@ export function RoomPage() {
           className="relative origin-top-left"
           style={{ width: `${BOARD_WIDTH}px`, height: `${BOARD_HEIGHT}px`, transform: `translate(${boardOffset.x}px, ${boardOffset.y}px) scale(${boardScale})` }}
         >
+        {room ? (
+          <StickerConnectionsLayer
+            room={room}
+            connections={stickerConnections}
+            blockLayouts={blockLayouts}
+            cardLayouts={cardLayouts}
+            draftFromCardId={connectionDraftFrom}
+            draftHoverCardId={connectionHoverCardId}
+            isLight={isLight}
+          />
+        ) : null}
         {pendingBlockKind && pendingBlockPos &&
           (() => {
             const base = getBaseBlockSize(pendingBlockKind);
@@ -5565,6 +6093,8 @@ export function RoomPage() {
                         : isLight
                           ? "border border-zinc-300 bg-white text-zinc-800"
                           : "border border-amber-900/40 bg-amber-200/10 text-zinc-100"
+                    } ${!cardMatchesMineFilter(c) ? "opacity-20 pointer-events-none" : ""} ${
+                      connectionDraftFrom === c.id ? "ring-2 ring-violet-500" : connectionHoverCardId === c.id ? "ring-2 ring-violet-400/80" : ""
                     }`}
                     style={{
                       left: cardLayout.x,
@@ -5572,13 +6102,29 @@ export function RoomPage() {
                       width: cardLayout.width,
                       height: cardLayout.height,
                       zIndex: cardMeta[c.id]?.z ?? 200,
-                      cursor: cardMeta[c.id]?.locked ? "default" : "move",
+                      cursor: connectionDraftFrom ? "crosshair" : cardMeta[c.id]?.locked ? "default" : "move",
                       ...(cardStyles[c.id]?.backgroundColor
                         ? { backgroundColor: cardStyles[c.id]!.backgroundColor! }
                         : {}),
                     }}
                     onContextMenu={(e) => openContextMenu(e, "card", c.id)}
-                    onMouseDown={(e) =>
+                    onMouseEnter={() => {
+                      if (connectionDraftFrom) setConnectionHoverCardId(c.id);
+                    }}
+                    onMouseLeave={() => {
+                      if (connectionDraftFrom) setConnectionHoverCardId((id) => (id === c.id ? null : id));
+                    }}
+                    onClick={(e) => {
+                      if (connectionDraftFrom) {
+                        e.stopPropagation();
+                        completeStickerConnection(c.id);
+                      }
+                    }}
+                    onMouseDown={(e) => {
+                      if (connectionDraftFrom) {
+                        e.stopPropagation();
+                        return;
+                      }
                       beginEntityDrag(
                         e,
                         {
@@ -5593,8 +6139,8 @@ export function RoomPage() {
                         "move",
                         "se",
                         true,
-                      )
-                    }
+                      );
+                    }}
                   >
                     {editingCardId === c.id ? (
                       <div className="min-h-0 flex-1">
@@ -5622,6 +6168,7 @@ export function RoomPage() {
                             onInput={(e) => {
                               const html = (e.target as HTMLDivElement | null)?.innerHTML ?? "";
                               setEditDrafts((prev) => ({ ...prev, [c.id]: html }));
+                              refreshMentionSuggest(c.id);
                             }}
                             onPaste={(e) => handleStickerPaste(c.id, e)}
                             onBlur={(e) => {
@@ -5629,13 +6176,7 @@ export function RoomPage() {
                               void saveCardText(c);
                             }}
                             onClick={stickerEditorLinkClick}
-                            onKeyDown={(e) => {
-                              if (e.key === "Escape") {
-                                e.preventDefault();
-                                (e.target as HTMLDivElement | null)?.blur();
-                                setEditingCardId(null);
-                              }
-                            }}
+                            onKeyDown={(e) => handleStickerEditorKeyDown(c.id, e)}
                             onWheel={(e) => e.stopPropagation()}
                           />
                         </div>
@@ -5643,12 +6184,26 @@ export function RoomPage() {
                     ) : (
                       <div className={`flex min-h-0 flex-1 overflow-hidden ${justifyClass}`}>
                         <div
-                          className="w-full whitespace-pre-wrap break-words"
+                          className="sticker-html w-full whitespace-pre-wrap break-words"
                           style={{ fontSize: `${textFontPx}px`, lineHeight: 1.25, textAlign }}
                           dangerouslySetInnerHTML={{ __html: c.text || "" }}
                         />
                       </div>
                     )}
+                    {cardTags[c.id]?.length ? (
+                      <div className="flex flex-wrap gap-0.5 px-0.5">
+                        {cardTags[c.id]!.map((tag) => (
+                          <span
+                            key={tag}
+                            className={`rounded px-1 py-px text-[9px] font-medium ${
+                              isLight ? "bg-violet-100 text-violet-800" : "bg-violet-900/50 text-violet-200"
+                            }`}
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                     <StickerReactionsBar cardId={c.id} />
                     <p
                       className={`truncate ${isLight ? "text-zinc-500" : "text-zinc-500"}`}
@@ -5811,6 +6366,8 @@ export function RoomPage() {
                   : isLight
                     ? "border border-zinc-300 bg-white text-zinc-800"
                     : "border border-amber-900/40 bg-amber-200/10 text-zinc-100"
+              } ${!cardMatchesMineFilter(c) ? "opacity-20 pointer-events-none" : ""} ${
+                connectionDraftFrom === c.id ? "ring-2 ring-violet-500" : connectionHoverCardId === c.id ? "ring-2 ring-violet-400/80" : ""
               }`}
               style={{
                 left: cardLayout.x,
@@ -5818,13 +6375,29 @@ export function RoomPage() {
                 width: cardLayout.width,
                 height: cardLayout.height,
                 zIndex: cardMeta[c.id]?.z ?? 200,
-                cursor: cardMeta[c.id]?.locked ? "default" : "move",
+                cursor: connectionDraftFrom ? "crosshair" : cardMeta[c.id]?.locked ? "default" : "move",
                 ...(cardStyles[c.id]?.backgroundColor
                   ? { backgroundColor: cardStyles[c.id]!.backgroundColor! }
                   : {}),
               }}
               onContextMenu={(e) => openContextMenu(e, "card", c.id)}
-              onMouseDown={(e) =>
+              onMouseEnter={() => {
+                if (connectionDraftFrom) setConnectionHoverCardId(c.id);
+              }}
+              onMouseLeave={() => {
+                if (connectionDraftFrom) setConnectionHoverCardId((id) => (id === c.id ? null : id));
+              }}
+              onClick={(e) => {
+                if (connectionDraftFrom) {
+                  e.stopPropagation();
+                  completeStickerConnection(c.id);
+                }
+              }}
+              onMouseDown={(e) => {
+                if (connectionDraftFrom) {
+                  e.stopPropagation();
+                  return;
+                }
                 beginEntityDrag(
                   e,
                   {
@@ -5838,8 +6411,8 @@ export function RoomPage() {
                   "move",
                   "se",
                   true,
-                )
-              }
+                );
+              }}
             >
               {editingCardId === c.id ? (
                 <div className="min-h-0 flex-1">
@@ -5867,6 +6440,7 @@ export function RoomPage() {
                       onInput={(e) => {
                         const html = (e.target as HTMLDivElement | null)?.innerHTML ?? "";
                         setEditDrafts((prev) => ({ ...prev, [c.id]: html }));
+                        refreshMentionSuggest(c.id);
                       }}
                       onPaste={(e) => handleStickerPaste(c.id, e)}
                       onBlur={(e) => {
@@ -5874,26 +6448,34 @@ export function RoomPage() {
                         void saveCardText(c);
                       }}
                       onClick={stickerEditorLinkClick}
-                      onKeyDown={(e) => {
-                        if (e.key === "Escape") {
-                          e.preventDefault();
-                          (e.target as HTMLDivElement | null)?.blur();
-                          setEditingCardId(null);
-                        }
-                      }}
+                      onKeyDown={(e) => handleStickerEditorKeyDown(c.id, e)}
                       onWheel={(e) => e.stopPropagation()}
                     />
                   </div>
                 </div>
               ) : (
                 <div
-                  className={`min-h-0 flex-1 overflow-hidden whitespace-pre-wrap break-words px-1 py-0.5 ${
+                  className={`sticker-html min-h-0 flex-1 overflow-hidden whitespace-pre-wrap break-words px-1 py-0.5 ${
                     isLight ? "text-zinc-900" : "text-white"
                   } ${justifyClass}`}
                   style={{ fontSize: `${textFontPx}px`, lineHeight: 1.25, textAlign }}
                   dangerouslySetInnerHTML={{ __html: c.text || "" }}
                 />
               )}
+              {cardTags[c.id]?.length ? (
+                <div className="flex flex-wrap gap-0.5 px-0.5">
+                  {cardTags[c.id]!.map((tag) => (
+                    <span
+                      key={tag}
+                      className={`rounded px-1 py-px text-[9px] font-medium ${
+                        isLight ? "bg-violet-100 text-violet-800" : "bg-violet-900/50 text-violet-200"
+                      }`}
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               <StickerReactionsBar cardId={c.id} />
               <p
                 className={`truncate ${isLight ? "text-zinc-500" : "text-zinc-500"}`}

@@ -1,4 +1,4 @@
-/** Быстрая палитра для вставки в стикер (без `:shortcodes:` — позже в плане). */
+/** Быстрая палитра для вставки в стикер; недавние — в `stickerEditorExtras`, shortcodes при сохранении. */
 export const STICKER_QUICK_EMOJI = [
   "😀",
   "😅",
