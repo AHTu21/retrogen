@@ -48,9 +48,19 @@
 | [x] | 9a | TipTap (MIT), хранение `Card.text` как HTML |
 | [x] | 9b | Редактор стикера: `StickerTipTapField` + `stickerTipTap/*` |
 | [x] | 9c | Панель форматирования через `runStickerTipTapCommand` |
-| [ ] | 10 | Опционально: JSON-документ вместо HTML / batch-миграция |
+| [x] | 10 | JSON-документ (`textDoc`) + HTML-кэш в `text`; миграция при сохранении |
 
-Черновик эпика: [TIPTAP_MIGRATION.md](./TIPTAP_MIGRATION.md). Вне scope PR: [TIPTAP_FUTURE.md](./TIPTAP_FUTURE.md).
+Эпик: [EPIC_STICKER_JSON.md](./EPIC_STICKER_JSON.md). Почему не Pro/Cloud: [WHY_NOT_TIPTAP_PRO_AND_WHOLE_BOARD.md](./WHY_NOT_TIPTAP_PRO_AND_WHOLE_BOARD.md).
+
+---
+
+## P4 — совместное редактирование (отдельный PR)
+
+| Статус | # | Задача |
+|--------|---|--------|
+| [ ] | 11 | Два участника в тексте одного стикера (Yjs + Socket.IO) |
+
+План: [EPIC_STICKER_COLLAB.md](./EPIC_STICKER_COLLAB.md).
 
 ---
 

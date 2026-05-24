@@ -101,6 +101,8 @@ model Card {
   blockId           String
   block             Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
   text              String   @default("")
+  /** TipTap / ProseMirror JSON; канон при сохранении из редактора. HTML в `text` — кэш для просмотра и отчётов. */
+  textDoc           Json?
   anonymous         Boolean  @default(false)
   authorDisplayName String?
   row               Int      @default(0)

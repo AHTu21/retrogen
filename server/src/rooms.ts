@@ -293,11 +293,26 @@ export async function resetRoom(slug: string, opts?: { actorUserId?: string | nu
   return { room: full };
 }
 
+const MAX_STICKER_TEXT_DOC_JSON_CHARS = 250_000;
+
+function parseStickerTextDoc(
+  value: unknown,
+): { ok: true; value: Prisma.InputJsonValue | typeof Prisma.JsonNull } | { ok: false; error: "bad_text_doc" | "text_doc_too_long" } {
+  if (value === null) return { ok: true, value: Prisma.JsonNull };
+  if (typeof value !== "object" || value === null) return { ok: false, error: "bad_text_doc" };
+  const root = value as { type?: string };
+  if (root.type !== "doc") return { ok: false, error: "bad_text_doc" };
+  const serialized = JSON.stringify(value);
+  if (serialized.length > MAX_STICKER_TEXT_DOC_JSON_CHARS) return { ok: false, error: "text_doc_too_long" };
+  return { ok: true, value: value as Prisma.InputJsonValue };
+}
+
 export async function updateCard(
   slug: string,
   cardId: string,
   input: {
     text?: string;
+    textDoc?: unknown | null;
     row?: number;
     col?: number;
     authorDisplayName?: string | null;
@@ -327,10 +342,18 @@ export async function updateCard(
     if (!nextBlock) return { error: "bad_block" as const };
   }
 
+  let textDocData: Prisma.InputJsonValue | typeof Prisma.JsonNull | undefined;
+  if (input.textDoc !== undefined) {
+    const parsed = parseStickerTextDoc(input.textDoc);
+    if (!parsed.ok) return { error: parsed.error };
+    textDocData = parsed.value;
+  }
+
   const updated = await prisma.card.update({
     where: { id: card.id },
     data: {
       text: typeof input.text === "string" ? input.text : undefined,
+      ...(textDocData !== undefined ? { textDoc: textDocData } : {}),
       row: typeof input.row === "number" ? input.row : undefined,
       col: typeof input.col === "number" ? input.col : undefined,
       authorDisplayName: input.authorDisplayName === undefined ? undefined : input.authorDisplayName,

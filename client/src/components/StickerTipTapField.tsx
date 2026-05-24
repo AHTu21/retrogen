@@ -1,11 +1,14 @@
+import type { JSONContent } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { useEffect, useRef } from "react";
+import { isStickerTextDoc } from "../lib/stickerTextDoc";
 import { createStickerEditorApi, type StickerEditorApi } from "../lib/stickerTipTap/api";
 import { createStickerTipTapExtensions } from "../lib/stickerTipTap/extensions";
 
 type Props = {
   cardId: string;
-  initialHtml: string;
+  /** HTML-черновик или JSON-документ с сервера (`textDoc`). */
+  initialContent: string | JSONContent;
   className?: string;
   style?: React.CSSProperties;
   spellCheck?: boolean;
@@ -19,7 +22,7 @@ type Props = {
 
 export function StickerTipTapField({
   cardId,
-  initialHtml,
+  initialContent,
   className = "",
   style,
   spellCheck = true,
@@ -35,7 +38,11 @@ export function StickerTipTapField({
 
   const editor = useEditor({
     extensions: createStickerTipTapExtensions(),
-    content: initialHtml?.trim() ? initialHtml : "<p></p>",
+    content: isStickerTextDoc(initialContent)
+      ? initialContent
+      : initialContent?.trim()
+        ? initialContent
+        : "<p></p>",
     enableInputRules: true,
     enablePasteRules: true,
     editorProps: {
@@ -67,13 +74,16 @@ export function StickerTipTapField({
   }, [editor, cardId, onRegister]);
 
   useEffect(() => {
-    if (!editor) return;
-    const next = initialHtml?.trim() ? initialHtml : "<p></p>";
-    const cur = editor.getHTML();
-    if (next !== cur && !editor.isFocused) {
-      editor.commands.setContent(next, { emitUpdate: false });
+    if (!editor || editor.isFocused) return;
+    if (isStickerTextDoc(initialContent)) {
+      const cur = JSON.stringify(editor.getJSON());
+      const next = JSON.stringify(initialContent);
+      if (cur !== next) editor.commands.setContent(initialContent, { emitUpdate: false });
+      return;
     }
-  }, [cardId, initialHtml, editor]);
+    const next = initialContent?.trim() ? initialContent : "<p></p>";
+    if (next !== editor.getHTML()) editor.commands.setContent(next, { emitUpdate: false });
+  }, [cardId, initialContent, editor]);
 
   if (!editor) return null;
 
