@@ -1,3 +1,5 @@
+import { mergeConnectionsById, parsePlaneConnections } from "./stickerConnections";
+import { parsePlaneCardTags } from "./stickerTags";
 import type { BoardGadgetDto, PlaneShapeDto, PlaneStateDto } from "../types";
 
 function asRecord(v: unknown): Record<string, unknown> {
@@ -142,6 +144,9 @@ export function mergePlaneFor409Retry(local: PlaneStateDto, serverRaw: unknown):
         : {};
   }
 
+  const cardTags = { ...(local.cardTags ?? {}), ...parsePlaneCardTags(srv) };
+  const connections = mergeConnectionsById(local.connections ?? [], parsePlaneConnections(srv));
+
   return {
     boardScale: local.boardScale,
     boardOffset: local.boardOffset,
@@ -154,5 +159,7 @@ export function mergePlaneFor409Retry(local: PlaneStateDto, serverRaw: unknown):
     cardStyles,
     blockStyles,
     planeShapes,
+    cardTags,
+    connections,
   };
 }

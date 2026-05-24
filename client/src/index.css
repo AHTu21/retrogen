@@ -15,6 +15,20 @@ html.theme-light body {
   @apply bg-zinc-100 text-zinc-900;
 }
 
+/* @упоминания в стикере (редактор и просмотр) */
+.sticker-mention,
+.sticker-html [data-mention] {
+  border-radius: 3px;
+  padding: 0 2px;
+  font-weight: 600;
+  background: rgb(14 165 233 / 0.22);
+}
+
+html.theme-dark .sticker-mention,
+html.theme-dark .sticker-html [data-mention] {
+  background: rgb(56 189 248 / 0.28);
+}
+
 html.corners-rounded {
   --app-radius: 0.75rem;
 }

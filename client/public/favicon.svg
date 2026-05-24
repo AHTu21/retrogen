@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Retrogen">
+  <rect width="32" height="32" rx="7" fill="#f59e0b"/>
+  <rect x="3" y="3" width="26" height="26" rx="5" fill="#fffbeb" stroke="#d97706" stroke-width="1.2"/>
+  <path
+    fill="#292524"
+    d="M10 9.5h5.2c2.8 0 4.5 1.4 4.5 3.6 0 1.5-.8 2.6-2.1 3.1l3.4 5.3h-3.4l-2.9-4.6H12.6V22H10V9.5zm2.6 2.2v3.4h2.4c1.3 0 2-.6 2-1.7s-.7-1.7-2-1.7h-2.4z"
+  />
+  <circle cx="25" cy="8" r="2.2" fill="#0ea5e9"/>
+</svg>
