@@ -15,7 +15,7 @@ function captureBackgroundColor(element: HTMLElement): string {
   return dark ? DEFAULT_STICKER_SURFACE_HEX.dark : DEFAULT_STICKER_SURFACE_HEX.light;
 }
 
-/** contentEditable в off-screen клоне часто не рисуется — заменяем на обычный div с тем же HTML. */
+/** ProseMirror / редактор в off-screen клоне часто не рисуется — заменяем на обычный div с тем же HTML. */
 function freezeStickerEditor(sourceCard: HTMLElement, cloneCard: HTMLElement) {
   const srcEditor = sourceCard.querySelector("[data-sticker-editor='true']");
   const cloneEditor = cloneCard.querySelector("[data-sticker-editor='true']");
@@ -23,7 +23,8 @@ function freezeStickerEditor(sourceCard: HTMLElement, cloneCard: HTMLElement) {
 
   const frozen = document.createElement("div");
   frozen.setAttribute("data-sticker-export-text", "true");
-  frozen.innerHTML = srcEditor.innerHTML;
+  const prose = srcEditor.querySelector(".ProseMirror");
+  frozen.innerHTML = prose instanceof HTMLElement ? prose.innerHTML : srcEditor.innerHTML;
   frozen.className = cloneEditor.className;
   frozen.style.cssText = cloneEditor.style.cssText;
 

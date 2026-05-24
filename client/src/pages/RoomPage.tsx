@@ -43,7 +43,6 @@ import {
   rememberStickerEmoji,
 } from "../lib/stickerEditorExtras";
 import {
-  findStickerTableCell,
   mergeStickerTableCellDown,
   mergeStickerTableCellRight,
   splitStickerTableCellHorizontal,
@@ -51,6 +50,8 @@ import {
 } from "../lib/stickerTableCells";
 import { exportStickerCardToPng } from "../lib/stickerPngExport";
 import { StickerConnectionsLayer } from "../components/StickerConnectionsLayer";
+import { StickerTipTapFieldLazy } from "../components/StickerTipTapFieldLazy";
+import type { StickerEditorApi } from "../lib/stickerTipTap/api";
 import {
   buildMentionCandidatesFromRoom,
   cardHtmlMentionsMe,
@@ -58,9 +59,9 @@ import {
   currentActorMentionIds,
   filterMentionCandidates,
   getMentionAutocompleteAtCaret,
-  insertMentionInEditor,
   type MentionCandidate,
 } from "../lib/stickerMentions";
+import { insertStickerTipTapMention } from "../lib/stickerTipTap/mentionInsert";
 import {
   formatStickerTagsForInput,
   parseStickerTagInput,
@@ -336,14 +337,6 @@ const STICKER_HTML_WARN_CHARS = 120_000;
 /** Жёсткий предел вставки и роста черновика. */
 const STICKER_HTML_MAX_CHARS = 600_000;
 
-function escapeHtmlAttr(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/'/g, "&#39;");
-}
-
-function escapeHtmlText(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
 function normalizeStickerHttpUrl(raw: string): string | null {
   const t = raw.trim();
   if (!t) return null;
@@ -546,8 +539,6 @@ export function RoomPage() {
   /** Интервал между абзацами: 0 — по умолчанию, 1 — средний, 2 — широкий */
   const [stickerEditorParaGap, setStickerEditorParaGap] = useState<0 | 1 | 2>(0);
   const [stickerSaveNotice, setStickerSaveNotice] = useState<string | null>(null);
-  const stickerUndoStackRef = useRef<Record<string, string[]>>({});
-  const stickerRedoStackRef = useRef<Record<string, string[]>>({});
   const stickerSaveNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
   /** Не полагаться на `socket.connected` в useMemo: ссылка на `socket` не меняется при connect. */
@@ -628,7 +619,36 @@ export function RoomPage() {
   const boardViewportRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
-  const editorRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const editorRefs = useRef<Record<string, StickerEditorApi | null>>({});
+
+  function stickerEditorDom(cardId: string): HTMLElement | null {
+    return editorRefs.current[cardId]?.getDom() ?? null;
+  }
+
+  function syncEditDraftFromEditor(cardId: string) {
+    const api = editorRefs.current[cardId];
+    if (!api) return;
+    setEditDrafts((prev) => ({ ...prev, [cardId]: api.getHtml() }));
+  }
+
+  const registerStickerEditor = useCallback((cardId: string, api: StickerEditorApi | null) => {
+    editorRefs.current[cardId] = api;
+  }, []);
+
+  const handleStickerHtmlChange = useCallback((cardId: string, html: string) => {
+    setEditDrafts((prev) => ({ ...prev, [cardId]: html }));
+    const editor = editorRefs.current[cardId]?.getDom();
+    if (!editor) {
+      setMentionSuggest(null);
+      return;
+    }
+    const ctx = getMentionAutocompleteAtCaret(editor);
+    if (!ctx) {
+      setMentionSuggest(null);
+      return;
+    }
+    setMentionSuggest({ cardId, query: ctx.query, pick: 0 });
+  }, []);
   type CopiedStickerStyle = {
     fontWeight: string;
     fontStyle: string;
@@ -716,43 +736,16 @@ export function RoomPage() {
     );
   }
 
-  function pushStickerUndoSnapshot(cardId: string) {
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    const html = editor.innerHTML;
-    const prev = stickerUndoStackRef.current[cardId] ?? [];
-    if (prev[prev.length - 1] === html) return;
-    const next = [...prev, html].slice(-80);
-    stickerUndoStackRef.current = { ...stickerUndoStackRef.current, [cardId]: next };
-    stickerRedoStackRef.current = { ...stickerRedoStackRef.current, [cardId]: [] };
-  }
-
   function stickerUndo(cardId: string) {
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    const u = stickerUndoStackRef.current[cardId] ?? [];
-    if (u.length === 0) return;
-    const target = u[u.length - 1];
-    const cur = editor.innerHTML;
-    stickerUndoStackRef.current = { ...stickerUndoStackRef.current, [cardId]: u.slice(0, -1) };
-    const r = stickerRedoStackRef.current[cardId] ?? [];
-    stickerRedoStackRef.current = { ...stickerRedoStackRef.current, [cardId]: [...r, cur].slice(-80) };
-    editor.innerHTML = target;
-    setEditDrafts((p) => ({ ...p, [cardId]: target }));
+    const api = editorRefs.current[cardId];
+    if (!api?.undo()) return;
+    syncEditDraftFromEditor(cardId);
   }
 
   function stickerRedo(cardId: string) {
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    const r = stickerRedoStackRef.current[cardId] ?? [];
-    if (r.length === 0) return;
-    const target = r[r.length - 1];
-    const cur = editor.innerHTML;
-    stickerRedoStackRef.current = { ...stickerRedoStackRef.current, [cardId]: r.slice(0, -1) };
-    const u = stickerUndoStackRef.current[cardId] ?? [];
-    stickerUndoStackRef.current = { ...stickerUndoStackRef.current, [cardId]: [...u, cur].slice(-80) };
-    editor.innerHTML = target;
-    setEditDrafts((p) => ({ ...p, [cardId]: target }));
+    const api = editorRefs.current[cardId];
+    if (!api?.redo()) return;
+    syncEditDraftFromEditor(cardId);
   }
 
   const load = useCallback(async () => {
@@ -2052,7 +2045,7 @@ export function RoomPage() {
     );
   }
 
-  function shouldSkipStickerSaveForFormatToolbar(e: React.FocusEvent<HTMLDivElement>) {
+  function shouldSkipStickerSaveForFormatToolbar(e: React.FocusEvent) {
     const next = e.relatedTarget as HTMLElement | null;
     return Boolean(
       next && typeof next.closest === "function" && next.closest("[data-sticker-format-toolbar='true']"),
@@ -2679,23 +2672,19 @@ export function RoomPage() {
   }
 
   function formatSticker(cardId: string, command: string, value?: string) {
-    pushStickerUndoSnapshot(cardId);
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    editor.focus();
-    document.execCommand(command, false, value);
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    const api = editorRefs.current[cardId];
+    if (!api) return;
+    api.runCommand(command, value);
+    syncEditDraftFromEditor(cardId);
   }
 
   function insertStickerEmojiChars(cardId: string, chars: string) {
     rememberStickerEmoji(chars);
     setStickerRecentEmojis(loadRecentStickerEmojis());
-    pushStickerUndoSnapshot(cardId);
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    editor.focus();
-    document.execCommand("insertText", false, chars);
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    const api = editorRefs.current[cardId];
+    if (!api) return;
+    api.insertText(chars);
+    syncEditDraftFromEditor(cardId);
   }
 
   function selectionInsideEditor(editor: HTMLElement) {
@@ -2707,12 +2696,12 @@ export function RoomPage() {
   }
 
   function wrapStickerSelectionStyle(cardId: string, styles: Record<string, string>) {
-    const editor = editorRefs.current[cardId];
+    const editor = stickerEditorDom(cardId);
     if (!editor) return;
     editor.focus();
     const range = selectionInsideEditor(editor);
     if (!range || range.collapsed) return;
-    pushStickerUndoSnapshot(cardId);
+    const api = editorRefs.current[cardId];
     const span = document.createElement("span");
     for (const [k, v] of Object.entries(styles)) {
       span.style.setProperty(k, v);
@@ -2730,59 +2719,35 @@ export function RoomPage() {
     nr.selectNodeContents(span);
     nr.collapse(false);
     sel?.addRange(nr);
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    api?.syncFromDom();
+    syncEditDraftFromEditor(cardId);
   }
 
   function insertStickerHtml(cardId: string, html: string) {
-    pushStickerUndoSnapshot(cardId);
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    editor.focus();
-    document.execCommand("insertHTML", false, html);
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    const api = editorRefs.current[cardId];
+    if (!api) return;
+    api.insertHtml(html);
+    syncEditDraftFromEditor(cardId);
   }
 
   function insertStickerTable(cardId: string) {
-    const border = "1px solid currentColor";
-    const cell = `style="border:${border};padding:3px 6px;min-width:1.5em;vertical-align:top"`;
-    insertStickerHtml(
-      cardId,
-      `<table style="border-collapse:collapse;width:100%;font:inherit"><tbody>` +
-        `<tr><td ${cell}>&nbsp;</td><td ${cell}>&nbsp;</td></tr>` +
-        `<tr><td ${cell}>&nbsp;</td><td ${cell}>&nbsp;</td></tr>` +
-        `</tbody></table>`,
-    );
+    const api = editorRefs.current[cardId];
+    if (!api) return;
+    api.runTableCommand("insertTable");
+    syncEditDraftFromEditor(cardId);
   }
 
   function stickerHighlightColor(cardId: string, color: string) {
-    pushStickerUndoSnapshot(cardId);
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    editor.focus();
-    try {
-      document.execCommand("styleWithCSS", false, "true");
-    } catch {
-      /* ignore */
-    }
-    const okHilite = document.execCommand("hiliteColor", false, color);
-    if (!okHilite) document.execCommand("backColor", false, color);
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    const api = editorRefs.current[cardId];
+    if (!api) return;
+    api.setHighlight(color);
+    syncEditDraftFromEditor(cardId);
   }
 
   function readStickerLinkHrefFromSelection(cardId: string): string {
-    const editor = editorRefs.current[cardId];
-    if (!editor) return "https://";
-    const sel = window.getSelection();
-    if (!sel?.anchorNode || !editor.contains(sel.anchorNode)) return "https://";
-    let node: HTMLElement | null =
-      sel.anchorNode.nodeType === Node.TEXT_NODE
-        ? sel.anchorNode.parentElement
-        : (sel.anchorNode as HTMLElement);
-    const anchor = node?.closest?.("a");
-    if (anchor && editor.contains(anchor)) {
-      return anchor.getAttribute("href") ?? "https://";
-    }
-    return "https://";
+    const api = editorRefs.current[cardId];
+    if (!api) return "https://";
+    return api.readLinkHref();
   }
 
   function openStickerLinkPanel(cardId: string) {
@@ -2797,42 +2762,10 @@ export function RoomPage() {
       if (stickerLinkHref.trim() !== "") window.alert("Введите корректный http(s) URL.");
       return;
     }
-    pushStickerUndoSnapshot(cardId);
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    editor.focus();
-    const sel = window.getSelection();
-    let anchor: HTMLAnchorElement | null = null;
-    if (sel?.anchorNode && editor.contains(sel.anchorNode)) {
-      let node: HTMLElement | null =
-        sel.anchorNode.nodeType === Node.TEXT_NODE
-          ? sel.anchorNode.parentElement
-          : (sel.anchorNode as HTMLElement);
-      const a = node?.closest?.("a");
-      if (a && editor.contains(a)) anchor = a;
-    }
-    if (anchor) {
-      anchor.href = href;
-      anchor.target = "_blank";
-      anchor.rel = "noopener noreferrer";
-    } else {
-      try {
-        document.execCommand("styleWithCSS", false, "true");
-      } catch {
-        /* ignore */
-      }
-      const ok = document.execCommand("createLink", false, href);
-      if (!ok) {
-        document.execCommand(
-          "insertHTML",
-          false,
-          `<a href="${escapeHtmlAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtmlText(
-            href.replace(/^https?:\/\//i, ""),
-          )}</a>`,
-        );
-      }
-    }
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    const api = editorRefs.current[cardId];
+    if (!api) return;
+    api.applyLink(href);
+    syncEditDraftFromEditor(cardId);
     setStickerLinkOpen(false);
   }
 
@@ -2841,21 +2774,14 @@ export function RoomPage() {
   }
 
   function clearStickerFormatting(cardId: string) {
-    pushStickerUndoSnapshot(cardId);
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    editor.focus();
-    try {
-      document.execCommand("removeFormat", false);
-      document.execCommand("unlink", false);
-    } catch {
-      /* ignore */
-    }
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    const api = editorRefs.current[cardId];
+    if (!api) return;
+    api.runCommand("removeFormat");
+    syncEditDraftFromEditor(cardId);
   }
 
   function copyStickerFormat(cardId: string) {
-    const editor = editorRefs.current[cardId];
+    const editor = stickerEditorDom(cardId);
     if (!editor) return;
     editor.focus();
     const range = selectionInsideEditor(editor);
@@ -2893,14 +2819,13 @@ export function RoomPage() {
   }
 
   function stickerSelectionCase(cardId: string, mode: "upper" | "lower" | "sentence") {
-    const editor = editorRefs.current[cardId];
+    const editor = stickerEditorDom(cardId);
     if (!editor) return;
     editor.focus();
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
     const range = sel.getRangeAt(0);
     if (!editor.contains(range.commonAncestorContainer) || range.collapsed) return;
-    pushStickerUndoSnapshot(cardId);
     const t = range.toString();
     let out = t;
     if (mode === "upper") out = t.toLocaleUpperCase("ru-RU");
@@ -2911,23 +2836,16 @@ export function RoomPage() {
     range.insertNode(document.createTextNode(out));
     sel.removeAllRanges();
     sel.addRange(range);
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    editorRefs.current[cardId]?.syncFromDom();
+    syncEditDraftFromEditor(cardId);
   }
 
   function stickerBlockquote(cardId: string) {
-    try {
-      document.execCommand("styleWithCSS", false, "true");
-    } catch {
-      /* ignore */
-    }
     formatSticker(cardId, "formatBlock", "blockquote");
   }
 
   function insertStickerCodeBlock(cardId: string) {
-    insertStickerHtml(
-      cardId,
-      `<pre style="margin:0.35em 0;padding:6px 8px;border-radius:6px;border:1px solid currentColor;overflow:auto;font-family:ui-monospace,monospace;font-size:0.88em;line-height:1.35"><code>&nbsp;</code></pre>`,
-    );
+    formatSticker(cardId, "formatBlock", "code");
   }
 
   function insertStickerHorizontalRule(cardId: string) {
@@ -2938,18 +2856,16 @@ export function RoomPage() {
     try {
       const text = await navigator.clipboard.readText();
       if (!text) return;
-      pushStickerUndoSnapshot(cardId);
-      const editor = editorRefs.current[cardId];
-      if (!editor) return;
-      editor.focus();
-      document.execCommand("insertText", false, text);
-      setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+      const api = editorRefs.current[cardId];
+      if (!api) return;
+      api.insertText(text);
+      syncEditDraftFromEditor(cardId);
     } catch {
       /* ignore */
     }
   }
 
-  function stickerEditorLinkClick(e: React.MouseEvent<HTMLDivElement>) {
+  function stickerEditorLinkClick(e: React.MouseEvent) {
     if (!e.ctrlKey && !e.metaKey) return;
     const a = (e.target as HTMLElement | null)?.closest?.("a[href]");
     if (!a) return;
@@ -2964,152 +2880,82 @@ export function RoomPage() {
     }
   }
 
-  function handleStickerPaste(cardId: string, e: ReactClipboardEvent<HTMLDivElement>) {
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
+  function handleStickerPaste(cardId: string, e: ReactClipboardEvent) {
+    const api = editorRefs.current[cardId];
+    if (!api) return;
     const htmlData = e.clipboardData.getData("text/html");
     const plain = e.clipboardData.getData("text/plain") ?? "";
+    const curLen = api.getHtml().length;
     if (htmlData && plain) {
       e.preventDefault();
-      if (editor.innerHTML.length + plain.length > STICKER_HTML_MAX_CHARS) return;
-      pushStickerUndoSnapshot(cardId);
-      editor.focus();
-      document.execCommand("insertText", false, plain);
-      setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+      if (curLen + plain.length > STICKER_HTML_MAX_CHARS) return;
+      api.insertText(plain);
+      syncEditDraftFromEditor(cardId);
       return;
     }
-    if (editor.innerHTML.length >= STICKER_HTML_MAX_CHARS) {
+    if (curLen >= STICKER_HTML_MAX_CHARS) {
       e.preventDefault();
     }
   }
 
   function stickerTableAddRowBelow(cardId: string) {
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    const cell = findStickerTableCell(editor);
-    const tr = cell?.closest("tr");
-    const table = tr?.closest("table");
-    if (!cell || !tr || !table) return;
-    if (tr.closest("thead")) return;
-    pushStickerUndoSnapshot(cardId);
-    const tbody = table.querySelector("tbody") ?? table;
-    const colCount = tr.children.length;
-    const newTr = document.createElement("tr");
-    for (let i = 0; i < colCount; i++) {
-      const td = document.createElement("td");
-      td.innerHTML = "&nbsp;";
-      const sample = tr.children[i] as HTMLTableCellElement | undefined;
-      const st = sample?.getAttribute("style");
-      if (st) td.setAttribute("style", st);
-      newTr.appendChild(td);
-    }
-    if (tr.parentNode === tbody) {
-      tbody.insertBefore(newTr, tr.nextSibling);
-    } else {
-      tbody.appendChild(newTr);
-    }
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    const api = editorRefs.current[cardId];
+    if (!api?.runTableCommand("addRowAfter")) return;
+    syncEditDraftFromEditor(cardId);
   }
 
   function stickerTableAddColumnRight(cardId: string) {
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    const cell = findStickerTableCell(editor);
-    const table = cell?.closest("table");
-    const tr = cell?.closest("tr");
-    if (!cell || !table || !tr) return;
-    pushStickerUndoSnapshot(cardId);
-    const colIdx = cell.cellIndex;
-    table.querySelectorAll("tr").forEach((row) => {
-      const ref = row.children[colIdx] as HTMLElement | undefined;
-      const isHead = Boolean(row.closest("thead"));
-      const td = document.createElement(isHead ? "th" : "td");
-      td.innerHTML = "&nbsp;";
-      const st = ref?.getAttribute("style");
-      if (st) td.setAttribute("style", st);
-      if (ref?.nextSibling) row.insertBefore(td, ref.nextSibling);
-      else if (ref) row.appendChild(td);
-    });
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    const api = editorRefs.current[cardId];
+    if (!api?.runTableCommand("addColumnAfter")) return;
+    syncEditDraftFromEditor(cardId);
   }
 
   function stickerTableRemoveRow(cardId: string) {
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    const cell = findStickerTableCell(editor);
-    const tr = cell?.closest("tr");
-    if (tr?.closest("thead")) return;
-    const tbody = tr?.closest("tbody") ?? tr?.parentElement;
-    if (!tr || !tbody) return;
-    const rows = tbody.querySelectorAll("tr");
-    if (rows.length <= 1) return;
-    pushStickerUndoSnapshot(cardId);
-    tr.remove();
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    const api = editorRefs.current[cardId];
+    if (!api?.runTableCommand("deleteRow")) return;
+    syncEditDraftFromEditor(cardId);
   }
 
   function stickerTableRemoveColumn(cardId: string) {
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    const cell = findStickerTableCell(editor);
-    const table = cell?.closest("table");
-    const tr = cell?.closest("tr");
-    if (!cell || !table || !tr) return;
-    const colIdx = cell.cellIndex;
-    if (tr.children.length <= 1) return;
-    pushStickerUndoSnapshot(cardId);
-    table.querySelectorAll("tr").forEach((row) => {
-      const el = row.children[colIdx];
-      if (el) el.remove();
-    });
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    const api = editorRefs.current[cardId];
+    if (!api?.runTableCommand("deleteColumn")) return;
+    syncEditDraftFromEditor(cardId);
   }
 
   function stickerTableMergeRight(cardId: string) {
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    const cell = findStickerTableCell(editor);
-    const next = cell?.nextElementSibling;
-    if (!cell || !next || (next.tagName !== "TD" && next.tagName !== "TH")) return;
-    pushStickerUndoSnapshot(cardId);
-    mergeStickerTableCellRight(editor);
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    const api = editorRefs.current[cardId];
+    const editor = stickerEditorDom(cardId);
+    if (!api || !editor) return;
+    if (!mergeStickerTableCellRight(editor)) return;
+    api.syncFromDom();
+    syncEditDraftFromEditor(cardId);
   }
 
   function stickerTableMergeDown(cardId: string) {
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    const cell = findStickerTableCell(editor);
-    const tr = cell?.closest("tr");
-    const table = tr?.closest("table");
-    if (!cell || !tr || !table) return;
-    const rows = table.querySelector("tbody")?.querySelectorAll("tr") ?? table.querySelectorAll("tr");
-    const rowIdx = Array.from(rows).indexOf(tr);
-    const below = rows[rowIdx + 1]?.children[cell.cellIndex] as HTMLElement | undefined;
-    if (!below || (below.tagName !== "TD" && below.tagName !== "TH")) return;
-    pushStickerUndoSnapshot(cardId);
-    mergeStickerTableCellDown(editor);
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    const api = editorRefs.current[cardId];
+    const editor = stickerEditorDom(cardId);
+    if (!api || !editor) return;
+    if (!mergeStickerTableCellDown(editor)) return;
+    api.syncFromDom();
+    syncEditDraftFromEditor(cardId);
   }
 
   function stickerTableSplitHorizontal(cardId: string) {
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    const cell = findStickerTableCell(editor);
-    if (!cell || cell.colSpan <= 1) return;
-    pushStickerUndoSnapshot(cardId);
-    splitStickerTableCellHorizontal(editor);
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    const api = editorRefs.current[cardId];
+    const editor = stickerEditorDom(cardId);
+    if (!api || !editor) return;
+    if (!splitStickerTableCellHorizontal(editor)) return;
+    api.syncFromDom();
+    syncEditDraftFromEditor(cardId);
   }
 
   function stickerTableSplitVertical(cardId: string) {
-    const editor = editorRefs.current[cardId];
-    if (!editor) return;
-    const cell = findStickerTableCell(editor);
-    if (!cell || cell.rowSpan <= 1) return;
-    pushStickerUndoSnapshot(cardId);
-    splitStickerTableCellVertical(editor);
-    setEditDrafts((prev) => ({ ...prev, [cardId]: editor.innerHTML ?? "" }));
+    const api = editorRefs.current[cardId];
+    const editor = stickerEditorDom(cardId);
+    if (!api || !editor) return;
+    if (!splitStickerTableCellVertical(editor)) return;
+    api.syncFromDom();
+    syncEditDraftFromEditor(cardId);
   }
 
   function insertStickerColumnsBlock(cardId: string, cols: 2 | 3) {
@@ -3182,28 +3028,15 @@ export function RoomPage() {
     return false;
   }
 
-  function refreshMentionSuggest(cardId: string) {
-    const editor = editorRefs.current[cardId];
-    if (!editor) {
-      setMentionSuggest(null);
-      return;
-    }
-    const ctx = getMentionAutocompleteAtCaret(editor);
-    if (!ctx) {
-      setMentionSuggest(null);
-      return;
-    }
-    setMentionSuggest({ cardId, query: ctx.query, pick: 0 });
-  }
-
   function pickMentionCandidate(candidate: MentionCandidate) {
     if (!mentionSuggest) return;
-    const editor = editorRefs.current[mentionSuggest.cardId];
-    if (!editor) return;
+    const api = editorRefs.current[mentionSuggest.cardId];
+    const editor = stickerEditorDom(mentionSuggest.cardId);
+    if (!api || !editor) return;
     const ctx = getMentionAutocompleteAtCaret(editor);
     if (!ctx) return;
-    insertMentionInEditor(editor, ctx, candidate);
-    setEditDrafts((prev) => ({ ...prev, [mentionSuggest.cardId]: editor.innerHTML ?? "" }));
+    insertStickerTipTapMention(api.getEditor(), editor, ctx, candidate);
+    syncEditDraftFromEditor(mentionSuggest.cardId);
     setMentionSuggest(null);
   }
 
@@ -3249,7 +3082,7 @@ export function RoomPage() {
     setStickerConnections((prev) => prev.filter((c) => c.fromCardId !== cardId && c.toCardId !== cardId));
   }
 
-  function handleStickerEditorKeyDown(cardId: string, e: React.KeyboardEvent<HTMLDivElement>) {
+  function handleStickerEditorKeyDown(cardId: string, e: React.KeyboardEvent) {
     if (mentionSuggest?.cardId === cardId && mentionCandidatesLive.length > 0) {
       const n = mentionCandidatesLive.length;
       if (e.key === "ArrowDown") {
@@ -3275,14 +3108,14 @@ export function RoomPage() {
         return;
       }
       e.preventDefault();
-      (e.target as HTMLDivElement | null)?.blur();
+      editorRefs.current[cardId]?.blur();
       setEditingCardId(null);
     }
   }
 
   async function exportStickerAsPng(cardId: string) {
-    const editor = editorRefs.current[cardId];
-    const card = editor?.closest("[data-sticker-card='true']");
+    const dom = stickerEditorDom(cardId);
+    const card = dom?.closest("[data-sticker-card='true']");
     if (!(card instanceof HTMLElement)) return;
     try {
       const shortId = cardId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 12) || "sticker";
@@ -3327,7 +3160,7 @@ export function RoomPage() {
     if (isLocked) return;
     if (mode === "move") {
       const target = event.target as HTMLElement | null;
-      if (target?.closest("button,input,textarea,select,a,[contenteditable='true'],[data-no-drag='true']")) return;
+      if (target?.closest("button,input,textarea,select,a,[data-sticker-editor='true'],[data-no-drag='true']")) return;
     }
     if (entity.kind === "block") {
       // Prevent click-to-place from firing after block drag end in "block in hand" mode.
@@ -3682,19 +3515,14 @@ export function RoomPage() {
     if (!editingCardId) return;
     const id = editingCardId;
     window.setTimeout(() => {
-      const editor = editorRefs.current[id];
-      if (!editor) return;
+      const api = editorRefs.current[id];
+      if (!api) return;
       const currentDraft = editDrafts[id] ?? room?.cards.find((c) => c.id === id)?.text ?? "";
-      if (editor.innerHTML !== currentDraft) {
-        editor.innerHTML = currentDraft;
+      const normalized = currentDraft?.trim() ? currentDraft : "<p></p>";
+      if (api.getHtml() !== normalized) {
+        api.setHtml(normalized);
       }
-      editor.focus();
-      const range = document.createRange();
-      range.selectNodeContents(editor);
-      range.collapse(false);
-      const selection = window.getSelection();
-      selection?.removeAllRanges();
-      selection?.addRange(range);
+      api.focus();
     }, 0);
     // Синхронизируем DOM и каретку только при входе в режим редактирования, иначе каждое обновление
     // черновика сбрасывало выделение и ломало тулбар/набор текста.
@@ -3713,7 +3541,7 @@ export function RoomPage() {
       return;
     }
     const recalc = () => {
-      const editor = editorRefs.current[editingCardId];
+      const editor = stickerEditorDom(editingCardId);
       if (!editor) return;
       const rect = editor.getBoundingClientRect();
       const width = Math.min(920, typeof window !== "undefined" ? window.innerWidth - 24 : 920);
@@ -5068,11 +4896,6 @@ export function RoomPage() {
                 onInput={(e) => {
                   const v = (e.target as HTMLInputElement).value;
                   setToolbarForeColor(v);
-                  try {
-                    document.execCommand("styleWithCSS", false, "true");
-                  } catch {
-                    /* ignore */
-                  }
                   formatSticker(editingCardId, "foreColor", v);
                 }}
               />
@@ -5145,11 +4968,6 @@ export function RoomPage() {
               onChange={(e) => {
                 const v = e.target.value;
                 if (v && editingCardId) {
-                  try {
-                    document.execCommand("styleWithCSS", false, "true");
-                  } catch {
-                    /* ignore */
-                  }
                   formatSticker(editingCardId, "fontName", v);
                 }
                 e.target.selectedIndex = 0;
@@ -6145,15 +5963,10 @@ export function RoomPage() {
                     {editingCardId === c.id ? (
                       <div className="min-h-0 flex-1">
                         <div className={`flex h-full min-h-0 ${justifyClass}`}>
-                          <div
-                            ref={(el) => {
-                              editorRefs.current[c.id] = el;
-                            }}
-                            data-sticker-editor="true"
-                            contentEditable
-                            spellCheck
-                            suppressContentEditableWarning
-                            className={`sticker-editor-scroll h-full w-full overflow-auto whitespace-pre-wrap outline-none ${
+                          <StickerTipTapFieldLazy
+                            cardId={c.id}
+                            initialHtml={editDrafts[c.id] ?? c.text ?? ""}
+                            className={`sticker-editor-scroll h-full w-full overflow-auto whitespace-pre-wrap ${
                               stickerEditorBreakAll ? "break-all" : "break-words"
                             } ${stickerEditorMono ? "font-mono" : ""} ${
                               stickerEditorParaGap === 1 ? "[&_p+p]:mt-2" : stickerEditorParaGap === 2 ? "[&_p+p]:mt-4" : ""
@@ -6165,19 +5978,15 @@ export function RoomPage() {
                               caretColor: "#0ea5e9",
                               padding: stickerEditorPaddingPx,
                             }}
-                            onInput={(e) => {
-                              const html = (e.target as HTMLDivElement | null)?.innerHTML ?? "";
-                              setEditDrafts((prev) => ({ ...prev, [c.id]: html }));
-                              refreshMentionSuggest(c.id);
-                            }}
-                            onPaste={(e) => handleStickerPaste(c.id, e)}
-                            onBlur={(e) => {
+                            onHtmlChange={handleStickerHtmlChange}
+                            onRegister={registerStickerEditor}
+                            onPaste={handleStickerPaste}
+                            onBlur={(_cardId, e) => {
                               if (shouldSkipStickerSaveForFormatToolbar(e)) return;
                               void saveCardText(c);
                             }}
-                            onClick={stickerEditorLinkClick}
-                            onKeyDown={(e) => handleStickerEditorKeyDown(c.id, e)}
-                            onWheel={(e) => e.stopPropagation()}
+                            onLinkClick={stickerEditorLinkClick}
+                            onKeyDown={handleStickerEditorKeyDown}
                           />
                         </div>
                       </div>
@@ -6417,15 +6226,10 @@ export function RoomPage() {
               {editingCardId === c.id ? (
                 <div className="min-h-0 flex-1">
                   <div className={`flex h-full min-h-0 ${justifyClass}`}>
-                    <div
-                      ref={(el) => {
-                        editorRefs.current[c.id] = el;
-                      }}
-                      data-sticker-editor="true"
-                      contentEditable
-                      spellCheck
-                      suppressContentEditableWarning
-                      className={`sticker-editor-scroll h-full w-full overflow-auto whitespace-pre-wrap outline-none ${
+                    <StickerTipTapFieldLazy
+                      cardId={c.id}
+                      initialHtml={editDrafts[c.id] ?? c.text ?? ""}
+                      className={`sticker-editor-scroll h-full w-full overflow-auto whitespace-pre-wrap ${
                         stickerEditorBreakAll ? "break-all" : "break-words"
                       } ${stickerEditorMono ? "font-mono" : ""} ${
                         stickerEditorParaGap === 1 ? "[&_p+p]:mt-2" : stickerEditorParaGap === 2 ? "[&_p+p]:mt-4" : ""
@@ -6437,19 +6241,15 @@ export function RoomPage() {
                         caretColor: "#0ea5e9",
                         padding: stickerEditorPaddingPx,
                       }}
-                      onInput={(e) => {
-                        const html = (e.target as HTMLDivElement | null)?.innerHTML ?? "";
-                        setEditDrafts((prev) => ({ ...prev, [c.id]: html }));
-                        refreshMentionSuggest(c.id);
-                      }}
-                      onPaste={(e) => handleStickerPaste(c.id, e)}
-                      onBlur={(e) => {
+                      onHtmlChange={handleStickerHtmlChange}
+                      onRegister={registerStickerEditor}
+                      onPaste={handleStickerPaste}
+                      onBlur={(_cardId, e) => {
                         if (shouldSkipStickerSaveForFormatToolbar(e)) return;
                         void saveCardText(c);
                       }}
-                      onClick={stickerEditorLinkClick}
-                      onKeyDown={(e) => handleStickerEditorKeyDown(c.id, e)}
-                      onWheel={(e) => e.stopPropagation()}
+                      onLinkClick={stickerEditorLinkClick}
+                      onKeyDown={handleStickerEditorKeyDown}
                     />
                   </div>
                 </div>

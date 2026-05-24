@@ -1,4 +1,4 @@
-/** Встроенные шаблоны текста для нового стикера (HTML для contentEditable после создания карточки). */
+/** Встроенные шаблоны текста для нового стикера (HTML для TipTap / Card.text). */
 
 export type BoardStickerTemplate = {
   id: string;

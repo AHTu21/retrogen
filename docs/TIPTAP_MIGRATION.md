@@ -1,25 +1,46 @@
-# Эпик: TipTap / ProseMirror вместо contentEditable
+# TipTap в редакторе стикера
 
-**Статус:** черновик (P3). Не начинать, пока P0–P1 не стабилизированы.
+**Статус:** выполнено (P3). Движок — [TipTap](https://tiptap.dev/) (MIT-расширения из npm).
 
-## Зачем
+## Что сделано
 
-- Предсказуемая вёрстка вместо `document.execCommand`
-- JSON-документ вместо сырого HTML в `Card.text`
-- Проще: mentions, совместное редактирование, diff
+- `client/src/components/StickerTipTapField.tsx` — поле редактирования на `@tiptap/react`
+- `client/src/lib/stickerTipTap/` — extensions, commands, API, node для `@упоминаний`
+- `RoomPage.tsx` — панель форматирования вызывает `editor.chain()` вместо `document.execCommand`
+- **`Card.text`** по-прежнему **HTML** (обратная совместимость API и отчётов)
 
-## Фазы (черновик)
+## Архитектура
 
-1. **ADR** — TipTap vs ProseMirror vs Lexical (зависимости, размер бандла, React).
-2. **PoC** — один стикер, сохранение JSON в новое поле или версионный маркер в HTML.
-3. **Паритет** — кнопки текущей панели через extensions.
-4. **Миграция** — скрипт HTML → JSON при открытии / batch на сервере.
-5. **Удаление** — legacy `execCommand`-путь.
+```mermaid
+flowchart LR
+  Toolbar[Панель RoomPage] --> Api[StickerEditorApi]
+  Api --> TipTap[TipTap Editor]
+  TipTap --> Html[getHTML / setContent]
+  Html --> Server[PATCH card.text]
+```
 
-## Риски
+## Доработки в ветке TipTap (технический хвост)
 
-- Размер бандла клиента
-- Обратная совместимость отчёта / экспорта MD
-- Одновременное редактирование текста двумя пользователями
+- Undo/redo панели — история TipTap (`History` в StarterKit), без дублирующих HTML-стеков
+- Таблицы: вставка и строки/столбцы — команды `@tiptap/extension-table`; merge/split — DOM + `syncFromDom`
+- @упоминания — `insertContent` через `mentionInsert.ts`
+- Код-блок — `toggleCodeBlock` вместо сырого `<pre>`
+- Lazy-load редактора — `StickerTipTapFieldLazy`
+- Убраны вызовы `document.execCommand` на панели
 
-См. чеклист: [STICKER_EDITOR_BACKLOG.md](./STICKER_EDITOR_BACKLOG.md) § P3.
+## Не в scope (отдельные ветки)
+
+См. [TIPTAP_FUTURE.md](./TIPTAP_FUTURE.md):
+
+- JSON-документ вместо HTML (бэклог §10)
+- Совместное редактирование текста в одном стикере (CRDT)
+- TipTap Pro / Cloud
+
+## Проверка вручную
+
+1. Открыть стикер двойным кликом — набор текста, жирный/курсив/списки
+2. `@` — автокомплит, вставка mention-span
+3. Ссылка, подсветка, таблица, PNG
+4. Сохранение на сервер (blur / Esc) — перезагрузка страницы, текст на месте
+
+См. [STICKER_EDITOR_BACKLOG.md](./STICKER_EDITOR_BACKLOG.md) § P3.
