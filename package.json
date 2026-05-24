@@ -8,6 +8,8 @@
   ],
   "scripts": {
     "changelog:append": "node ./scripts/changelog-append.mjs",
+    "version:bump-dry-run": "node ./scripts/bump-version-on-merge.mjs --dry-run",
+    "release:prod": "node ./scripts/release-prod.mjs",
     "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w client && npm run build -w server",
     "db:generate": "npm run db:generate -w server",
