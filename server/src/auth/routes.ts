@@ -89,4 +89,27 @@ export function registerAuthRoutes(app: FastifyInstance) {
     if (!u) return reply.code(401).send({ error: "unauthorized" });
     return { user: u };
   });
+
+  app.patch<{ Body: { displayName?: string } }>("/api/auth/me", async (req, reply) => {
+    const u = await getBearerUser(req);
+    if (!u) return reply.code(401).send({ error: "unauthorized" });
+    const displayName =
+      typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 120) : null;
+    if (displayName === null) {
+      return reply.code(400).send({ error: "display_name_required" });
+    }
+    const user = await prisma.user.update({
+      where: { id: u.id },
+      data: { displayName },
+      select: { id: true, email: true, displayName: true, globalRole: true },
+    });
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        globalRole: user.globalRole,
+      },
+    };
+  });
 }
