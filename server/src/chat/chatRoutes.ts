@@ -63,7 +63,10 @@ function mapChatError(e: unknown, reply: FastifyReply) {
     members_already_in_chat: 400,
   };
   const code = codes[msg] ?? 500;
-  if (code === 500) return reply.code(500).send({ error: "internal" });
+  if (code === 500) {
+    if (process.env.NODE_ENV !== "production") console.error("[chat]", e);
+    return reply.code(500).send({ error: "internal" });
+  }
   return reply.code(code).send({ error: msg });
 }
 
