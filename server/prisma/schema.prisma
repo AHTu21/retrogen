@@ -21,8 +21,12 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  ownedRooms  Room[]       @relation("RoomOwner")
-  memberships RoomMember[]
+  ownedRooms       Room[]       @relation("RoomOwner")
+  memberships      RoomMember[]
+  chatMemberships  ChatMember[]
+  createdChats     Chat[]       @relation("ChatCreator")
+  messages         Message[]
+  hiddenMessages   MessageHidden[]
 }
 
 /** Участник комнаты с ролью (расширяемо: co-facilitator, viewer). */
@@ -188,4 +192,129 @@ model WarmupVote {
   updatedAt DateTime @updatedAt
 
   @@unique([roomId, voterKey])
+}
+
+enum ChatKind {
+  direct
+  group
+  channel
+  system
+}
+
+enum ChatMemberRole {
+  owner
+  admin
+  member
+}
+
+enum MessageKind {
+  text
+  system
+  file
+}
+
+enum ReceiptKind {
+  delivered
+  read
+}
+
+model Chat {
+  id            String    @id @default(uuid())
+  kind          ChatKind
+  title         String    @default("")
+  description   String    @default("")
+  avatarUrl     String?
+  systemKey     String?   @unique
+  directKey     String?   @unique
+  createdById   String?
+  createdBy     User?     @relation("ChatCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  isArchived    Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastMessageId String?
+  lastMessage   Message?  @relation("ChatLastMessage", fields: [lastMessageId], references: [id], onDelete: SetNull)
+  members       ChatMember[]
+  messages      Message[] @relation("ChatMessages")
+
+  @@index([updatedAt])
+}
+
+model ChatMember {
+  id                 String         @id @default(uuid())
+  chatId             String
+  chat               Chat           @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role               ChatMemberRole @default(member)
+  joinedAt           DateTime       @default(now())
+  lastReadMessageId  String?
+  mutedUntil         DateTime?
+
+  @@unique([chatId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id               String      @id @default(uuid())
+  chatId           String
+  chat             Chat        @relation("ChatMessages", fields: [chatId], references: [id], onDelete: Cascade)
+  authorId         String?
+  author           User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  kind             MessageKind @default(text)
+  text             String      @default("")
+  replyToMessageId String?
+  replyTo          Message?    @relation("MessageReply", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies          Message[]   @relation("MessageReply")
+  clientMessageId  String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  editedAt         DateTime?
+  deletedAt        DateTime?
+  attachments      MessageAttachment[]
+  receipts         MessageReceipt[]
+  hiddenFor        MessageHidden[]
+  lastMessageFor   Chat[]      @relation("ChatLastMessage")
+
+  @@unique([chatId, clientMessageId])
+  @@index([chatId, createdAt])
+  @@index([authorId])
+}
+
+model MessageAttachment {
+  id           String   @id @default(uuid())
+  messageId    String
+  message      Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  storageKey   String
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  checksum     String?
+  createdAt    DateTime @default(now())
+
+  @@index([messageId])
+}
+
+model MessageReceipt {
+  id        String      @id @default(uuid())
+  messageId String
+  message   Message     @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  kind      ReceiptKind
+  createdAt DateTime    @default(now())
+
+  @@unique([messageId, userId, kind])
+  @@index([userId])
+}
+
+/** Сообщение скрыто только у данного пользователя («удалить у меня»). */
+model MessageHidden {
+  id        String   @id @default(uuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hiddenAt  DateTime @default(now())
+
+  @@unique([messageId, userId])
+  @@index([userId])
 }
