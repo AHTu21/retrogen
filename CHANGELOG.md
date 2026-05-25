@@ -8,6 +8,12 @@
 
 ## [Unreleased]
 
+_Черновик до следующего релиза; в окне «О программе» не показывается._
+
+<!-- changelog:user -->
+
+## [0.11.0] — 2026-05-26
+
 ### Сообщения (`/messages`)
 
 - **Раздел «Сообщения»** в меню приложения: личные чаты, **группы**, системные каналы (**Новости** — только чтение, **Поддержка** — диалог с командой и **быстрыми командами**).
@@ -20,8 +26,6 @@
 ### Интерфейс
 
 - Пункт **«Сообщения»** в overflow-меню шапки (рядом с профилем и комнатами).
-
-<!-- changelog:user -->
 
 ## [0.10.0] — 2026-05-26
 
@@ -206,7 +210,7 @@
 
 ### API и сервер (история по релизам)
 
-- **Unreleased / мессенджер:** Prisma `Chat`, `ChatMember`, `Message`, `MessageAttachment`, `MessageHidden`; модуль `server/src/chat/`; REST `/api/chats`, вложения `/api/chat/attachments/:id`, группа (`PATCH …/group/avatar`, `POST …/group/members`, `POST …/leave`, `DELETE …/:chatId`); Socket.IO `chat:join`, `chat:message.created|updated|hidden`, `chat:list.updated`, `chat:typing`. Файлы вложений — `server/data/chat-attachments/` (в `.gitignore`). Миграции `20260525180000_messenger`, `20260525200000_message_hidden`; после pull — `npm run db:deploy`.
+- **0.11.0 / мессенджер:** Prisma `Chat`, `ChatMember`, `Message`, `MessageAttachment`, `MessageHidden`; модуль `server/src/chat/`; REST `/api/chats`, вложения `/api/chat/attachments/:id`, группа (`PATCH …/group/avatar`, `POST …/group/members`, `POST …/leave`, `DELETE …/:chatId`); Socket.IO `chat:join`, `chat:message.created|updated|hidden`, `chat:list.updated`, `chat:typing`. Файлы вложений — `server/data/chat-attachments/` (в `.gitignore`). Миграции `20260525180000_messenger`, `20260525200000_message_hidden`; после pull — `npm run db:deploy`.
 - **0.10.0:** только клиент — `retrogen_profile_v1` в `localStorage`, событие `retrogen-profile`; модули `pages/profile/*`, `profileAccent`, `profileRoomColors`; миграция legacy (аватар ≠ обои доски).
 - **0.9.0:** миграция `Card.textDoc` (JSONB); сокет `stickerCollab:*` (Yjs relay in-memory).
 - **0.9.0 / ранее:** комната `listedInLobby`, `joinPasswordHash`, `POST /unlock`, `PATCH /access`; сокет **`planeLive`** → `plane.preview`; прокси Vite к Socket.IO в dev.
