@@ -8,6 +8,7 @@ import { prisma } from "./lib/prisma.js";
 import { userCanFacilitateBySlug } from "./roomsAcl.js";
 import { sanitizeTheme } from "./lib/sanitizeTheme.js";
 import { roomAccessStatus } from "./roomAccess.js";
+import { registerChatRoutes } from "./chat/chatRoutes.js";
 import {
   createRoom,
   createCard,
@@ -41,6 +42,7 @@ const roomUnlockPre = async (req: FastifyRequest<{ Params: { slug: string } }>, 
 
 export async function registerRoutes(app: FastifyInstance, io: Server) {
   registerAuthRoutes(app);
+  registerChatRoutes(app, io);
 
   app.post<{
     Body: { theme?: string; kind?: string; listedInLobby?: boolean; joinPassword?: string };

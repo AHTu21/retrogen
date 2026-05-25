@@ -5,8 +5,13 @@ import { config as loadEnv } from "dotenv";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
+import multipart from "@fastify/multipart";
 import { attachSocket } from "./socket.js";
 import { registerRoutes } from "./routes.js";
+import {
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  MAX_ATTACHMENT_BYTES,
+} from "./chat/attachmentPolicy.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: path.join(__dirname, "..", ".env") });
@@ -18,6 +23,12 @@ async function main() {
   const app = Fastify({ logger: true });
 
   await app.register(cors, { origin: true });
+  await app.register(multipart, {
+    limits: {
+      fileSize: MAX_ATTACHMENT_BYTES,
+      files: MAX_ATTACHMENTS_PER_MESSAGE,
+    },
+  });
 
   const io = attachSocket(app.server);
   await registerRoutes(app, io);

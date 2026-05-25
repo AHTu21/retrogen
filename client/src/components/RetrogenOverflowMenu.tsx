@@ -87,6 +87,9 @@ export function RetrogenOverflowMenu({
           <Link to="/workshop" role="menuitem" className={itemClass(isLight)} onClick={() => setOpen(false)}>
             Мастерская
           </Link>
+          <Link to="/messages" role="menuitem" className={itemClass(isLight)} onClick={() => setOpen(false)}>
+            Мессенджер
+          </Link>
           {teamRoomSlug ? (
             <Link
               to={`/r/${teamRoomSlug}/team`}
