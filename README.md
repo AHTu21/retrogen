@@ -10,6 +10,20 @@
 3. **Миграции:** из корня репозитория `npm run db:deploy` (или `npm run db:migrate` для интерактивной разработки).
 4. **Запуск:** `npm run dev` — клиент http://localhost:5173, API и WebSocket http://localhost:3000.
 
+### Если localhost:5173 отдаёт 404
+
+На Windows иногда на порту **5173** остаётся старый процесс Node (только IPv6 `[::1]`), а новый Vite слушает **127.0.0.1** — тогда `http://localhost:5173` не открывается, а `http://127.0.0.1:5173` работает.
+
+Завершите лишний процесс на 5173 (Диспетчер задач → Node.js) или в PowerShell:
+
+```powershell
+Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue |
+  Select-Object -ExpandProperty OwningProcess -Unique |
+  ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
+```
+
+Затем снова `npm run dev`. API через прокси Vite: `http://localhost:5173/api/...`.
+
 Переменные для сервера читаются из **`server/.env`** (подхватываются и Prisma CLI при запуске из каталога `server`, и самим приложением).
 
 Если `psql` не в `PATH`, добавьте `bin` установки PostgreSQL в переменную окружения или подключайтесь через pgAdmin — на работу приложения это не влияет, нужна только корректная строка `DATABASE_URL`.
@@ -26,6 +40,8 @@
 См. **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)**.
 
 ## Git и совместная разработка
+
+Команда и приглашение в GitHub Collaborators: **[docs/CONTRIBUTORS.md](./docs/CONTRIBUTORS.md)**.
 
 1. Клонируйте репозиторий, в корне: `npm install`.
 2. Скопируйте **`server/.env.example` → `server/.env`**, при необходимости **`client/.env.example` → `client/.env`** (файлы `.env` в git не попадают).
