@@ -31,7 +31,13 @@ import {
 import type { BoardGadgetDto, PlaneShapeDto, PlaneStateDto, RoomDto } from "../types";
 import { BOARD_SCHEME_PRESETS, BOARD_STICKER_TEMPLATES } from "../lib/boardTemplates";
 import { maxLayerZ, minLayerZ } from "../lib/layerZ";
-import { cursorCss, loadProfilePrefs, type UserProfilePrefs } from "../lib/profilePrefs";
+import {
+  cursorCss,
+  effectiveBoardBackdrop,
+  effectiveBoardWallpaper,
+  loadProfilePrefs,
+  type UserProfilePrefs,
+} from "../lib/profilePrefs";
 import { contrastRatio } from "../lib/colorContrast";
 import { STICKER_QUICK_EMOJI } from "../lib/stickerEmojiPresets";
 import {
@@ -3854,19 +3860,35 @@ export function RoomPage() {
 
   if (loadError) {
     return (
-      <div className="mx-auto max-w-lg px-6 py-16">
-        <p className="text-red-400">{loadError}</p>
-        <button type="button" className="mt-4 text-sky-400 underline" onClick={() => navigate("/home")}>
-          На главную
-        </button>
+      <div
+        className={`flex min-h-screen flex-col items-center justify-center px-6 py-16 ${
+          isLight ? "bg-zinc-50 text-zinc-900" : "bg-zinc-950 text-zinc-100"
+        }`}
+      >
+        <div className="mx-auto w-full max-w-lg text-center">
+          <p className={isLight ? "font-medium text-red-600" : "text-red-400"}>{loadError}</p>
+          <button
+            type="button"
+            className={`mt-4 text-sm font-medium underline-offset-2 hover:underline ${
+              isLight ? "text-sky-700" : "text-sky-400"
+            }`}
+            onClick={() => navigate("/home")}
+          >
+            На главную
+          </button>
+        </div>
       </div>
     );
   }
 
   if (!room || !themePack) {
     return (
-      <div className="mx-auto max-w-lg px-6 py-16">
-        <p className="text-zinc-400">Загрузка…</p>
+      <div
+        className={`flex min-h-screen items-center justify-center px-6 py-16 ${
+          isLight ? "bg-zinc-50 text-zinc-600" : "bg-zinc-950 text-zinc-400"
+        }`}
+      >
+        <p className="mx-auto max-w-lg text-center">Загрузка…</p>
       </div>
     );
   }
@@ -4124,18 +4146,21 @@ export function RoomPage() {
     <div
       className="relative flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden overscroll-none"
       style={{
-        background: profileFx.boardBackdrop
-          ? profileFx.boardBackdrop
-          : isLight
-            ? "linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)"
-            : `linear-gradient(180deg, ${palette.bg} 0%, #0a0d12 100%)`,
+        background: (() => {
+          const backdrop = effectiveBoardBackdrop(profileFx.boardBackdrop, profileFx.avatarDataUrl);
+          return backdrop
+            ? backdrop
+            : isLight
+              ? "linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)"
+              : `linear-gradient(180deg, ${palette.bg} 0%, #0a0d12 100%)`;
+        })(),
         cursor: cursorCss(profileFx.cursorStyle),
       }}
     >
-      {profileFx.wallpaperDataUrl ? (
+      {effectiveBoardWallpaper(profileFx) ? (
         <div
           className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(${profileFx.wallpaperDataUrl})` }}
+          style={{ backgroundImage: `url(${effectiveBoardWallpaper(profileFx)})` }}
           aria-hidden
         />
       ) : null}

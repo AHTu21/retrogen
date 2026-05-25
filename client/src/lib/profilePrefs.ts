@@ -1,7 +1,13 @@
+import {
+  DEFAULT_PROFILE_ACCENT,
+  LEGACY_PROFILE_ACCENT,
+  normalizeProfileAccent,
+} from "./profileAccent";
+import { normalizeBoardBackdropColor, normalizeHeaderTintColor } from "./profileRoomColors";
+
 const KEY = "retrogen_profile_v1";
 /** Макс. длина data URL обоев для localStorage */
 export const MAX_WALLPAPER_CHARS = 1_200_000; // ~900KB base64 jpeg rough cap
-
 export type CursorStyle = "default" | "crosshair" | "pointer" | "grab";
 
 export type UserProfilePrefs = {
@@ -19,7 +25,11 @@ export type UserProfilePrefs = {
   /** CSS color overlay for header bar in room */
   headerTint: string;
   cursorStyle: CursorStyle;
-  /** optional data URL for workspace background */
+  /** Акцент страницы профиля (#RRGGBB) */
+  profileAccent: string;
+  /** Фото профиля (отдельно от обоев доски) */
+  avatarDataUrl: string | null;
+  /** Обои поверх фона комнаты /r/… */
   wallpaperDataUrl: string | null;
 };
 
@@ -35,15 +45,64 @@ const defaultPrefs: UserProfilePrefs = {
   boardBackdrop: "",
   headerTint: "",
   cursorStyle: "default",
+  profileAccent: DEFAULT_PROFILE_ACCENT,
+  avatarDataUrl: null,
   wallpaperDataUrl: null,
 };
+
+const DATA_IMAGE_RE = /^data:image\//i;
+
+/** Обои доски: не показывать аватар профиля (legacy: одно поле на всё). */
+export function effectiveBoardWallpaper(
+  prefs: Pick<UserProfilePrefs, "wallpaperDataUrl" | "avatarDataUrl">,
+): string | null {
+  const w = prefs.wallpaperDataUrl?.trim() || null;
+  if (!w) return null;
+  const a = prefs.avatarDataUrl?.trim() || null;
+  if (a && w === a) return null;
+  return w;
+}
+
+/** CSS-фон доски: без data URL (раньше сюда попадало фото профиля). */
+export function effectiveBoardBackdrop(backdrop: string, avatarDataUrl: string | null): string {
+  const b = backdrop.trim();
+  if (!b) return "";
+  if (DATA_IMAGE_RE.test(b)) return "";
+  const a = avatarDataUrl?.trim() || null;
+  if (a && b === a) return "";
+  return b;
+}
+
+function sanitizeProfilePrefs(p: UserProfilePrefs): UserProfilePrefs {
+  let avatarDataUrl = p.avatarDataUrl?.trim() ? p.avatarDataUrl : null;
+  let wallpaperDataUrl = p.wallpaperDataUrl?.trim() ? p.wallpaperDataUrl : null;
+  let boardBackdrop = p.boardBackdrop;
+
+  if (boardBackdrop.trim().startsWith("data:image")) {
+    if (!avatarDataUrl) avatarDataUrl = boardBackdrop.trim();
+    boardBackdrop = "";
+  }
+
+  if (!avatarDataUrl && wallpaperDataUrl) {
+    avatarDataUrl = wallpaperDataUrl;
+    wallpaperDataUrl = null;
+  } else if (avatarDataUrl && wallpaperDataUrl && avatarDataUrl === wallpaperDataUrl) {
+    wallpaperDataUrl = null;
+  }
+
+  boardBackdrop = effectiveBoardBackdrop(boardBackdrop, avatarDataUrl);
+  boardBackdrop = normalizeBoardBackdropColor(boardBackdrop);
+  const headerTint = normalizeHeaderTintColor(p.headerTint);
+
+  return { ...p, avatarDataUrl, wallpaperDataUrl, boardBackdrop, headerTint };
+}
 
 export function loadProfilePrefs(): UserProfilePrefs {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return { ...defaultPrefs };
     const p = JSON.parse(raw) as Partial<UserProfilePrefs>;
-    return {
+    const loaded: UserProfilePrefs = {
       displayName: typeof p.displayName === "string" ? p.displayName : "",
       contact: typeof p.contact === "string" ? p.contact : "",
       gender: typeof p.gender === "string" ? p.gender : "",
@@ -58,26 +117,41 @@ export function loadProfilePrefs(): UserProfilePrefs {
         p.cursorStyle === "crosshair" || p.cursorStyle === "pointer" || p.cursorStyle === "grab"
           ? p.cursorStyle
           : "default",
+      profileAccent: (() => {
+        const rawAccent = typeof p.profileAccent === "string" ? p.profileAccent : DEFAULT_PROFILE_ACCENT;
+        const norm = normalizeProfileAccent(rawAccent);
+        return norm === LEGACY_PROFILE_ACCENT ? DEFAULT_PROFILE_ACCENT : norm;
+      })(),
+      avatarDataUrl: typeof p.avatarDataUrl === "string" ? p.avatarDataUrl : null,
       wallpaperDataUrl: typeof p.wallpaperDataUrl === "string" ? p.wallpaperDataUrl : null,
     };
+    const sanitized = sanitizeProfilePrefs(loaded);
+    if (JSON.stringify(sanitized) !== JSON.stringify(loaded)) {
+      saveProfilePrefs(sanitized);
+    }
+    return sanitized;
   } catch {
     return { ...defaultPrefs };
   }
 }
 
-export function saveProfilePrefs(p: UserProfilePrefs) {
-  const safe: UserProfilePrefs = {
+function capDataUrl(url: string | null) {
+  return url && url.length > MAX_WALLPAPER_CHARS ? null : url;
+}
+
+/** Нормализует и пишет в localStorage; возвращает итоговые prefs для state. */
+export function saveProfilePrefs(p: UserProfilePrefs): UserProfilePrefs {
+  const safe = sanitizeProfilePrefs({
     ...p,
-    wallpaperDataUrl:
-      p.wallpaperDataUrl && p.wallpaperDataUrl.length > MAX_WALLPAPER_CHARS
-        ? null
-        : p.wallpaperDataUrl,
-  };
+    avatarDataUrl: capDataUrl(p.avatarDataUrl),
+    wallpaperDataUrl: capDataUrl(p.wallpaperDataUrl),
+  });
   try {
     localStorage.setItem(KEY, JSON.stringify(safe));
   } catch {
     /* ignore quota */
   }
+  return safe;
 }
 
 export function cursorCss(v: CursorStyle): string {
