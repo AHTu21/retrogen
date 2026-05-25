@@ -81,7 +81,7 @@ export function RetrogenOverflowMenu({
           <Link to="/profile" role="menuitem" className={itemClass(isLight)} onClick={() => setOpen(false)}>
             Профиль
           </Link>
-          <Link to="/profile#retrogen-profile-settings" role="menuitem" className={itemClass(isLight)} onClick={() => setOpen(false)}>
+          <Link to="/profile#room" role="menuitem" className={itemClass(isLight)} onClick={() => setOpen(false)}>
             Настройки
           </Link>
           <Link to="/workshop" role="menuitem" className={itemClass(isLight)} onClick={() => setOpen(false)}>
