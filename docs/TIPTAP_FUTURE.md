@@ -2,23 +2,9 @@
 
 Задачи, которые **не входят** в merge TipTap (`feature/tiptap-poc` → `main`).
 
-## §10 — JSON (`textDoc`) — сделано в `main`
+## §10 и collab — релиз [0.9.0]
 
-| Задача | Статус |
-|--------|--------|
-| Поле `Card.textDoc` (JSON) + `Card.text` (HTML-кэш) | ✅ |
-| Сохранение `getJSON()` + `getHTML()` | ✅ |
-| Batch на сервере | опционально, см. [EPIC_STICKER_JSON.md](./EPIC_STICKER_JSON.md) |
-
-## Совместное редактирование стикера — сделано
-
-| Задача | Статус |
-|--------|--------|
-| Yjs + Socket.IO (`stickerCollab:*`) | ✅ |
-| TipTap Collaboration + курсоры | ✅ |
-| Отдельно от `planeLive` | ✅ |
-
-См. [EPIC_STICKER_COLLAB.md](./EPIC_STICKER_COLLAB.md).
+См. CHANGELOG **`[0.9.0]`**. Опционально: batch-миграция `textDoc` — [EPIC_STICKER_JSON.md](./EPIC_STICKER_JSON.md); чужие курсоры — [EPIC_STICKER_COLLAB.md](./EPIC_STICKER_COLLAB.md).
 
 ## Не планируем
 
