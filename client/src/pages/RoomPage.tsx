@@ -78,6 +78,12 @@ import { planeStateFingerprint } from "../lib/planeFingerprint";
 import { mergePlaneFor409Retry } from "../lib/mergePlane409";
 import { boardPointFromClient, boardViewportCenterWorld, worldSizeFromCssPixels } from "../lib/boardPlaneCoords";
 import { tryEmitPlaneLivePreview } from "../lib/planeLivePreview";
+import {
+  collectRoomParticipantNames,
+  normalizeGadgetList,
+  pickRandomParticipantName,
+} from "../lib/planeGadgets";
+import { PlaneGadgetLayer } from "../components/plane/PlaneGadgetLayer";
 import { createAppSocket } from "../lib/socketClient";
 import { getRoomUnlockToken } from "../lib/roomUnlockStorage";
 import { recordRoomVisit } from "../lib/roomLobbyPrefs";
@@ -221,33 +227,6 @@ function normalizeMemeEntry(raw: unknown): MemeItem | null {
   };
 }
 
-function normalizeGadgetList(raw: unknown): BoardGadgetDto[] {
-  if (!Array.isArray(raw)) return [];
-  const out: BoardGadgetDto[] = [];
-  for (const g of raw) {
-    if (!g || typeof g !== "object") continue;
-    const o = g as Record<string, unknown>;
-    if (o.kind !== "timer") continue;
-    if (typeof o.id !== "string") continue;
-    const x = Number(o.x),
-      y = Number(o.y),
-      ends = Number(o.endsAtMs);
-    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(ends)) continue;
-    const layerZ =
-      typeof o.layerZ === "number" && Number.isFinite(o.layerZ) ? o.layerZ : 320 + out.length;
-    out.push({
-      id: o.id,
-      kind: "timer",
-      x,
-      y,
-      endsAtMs: ends,
-      label: typeof o.label === "string" ? o.label : undefined,
-      layerZ,
-    });
-  }
-  return out;
-}
-
 function normalizePlaneShapesList(raw: unknown): PlaneShapeDto[] {
   if (!Array.isArray(raw)) return [];
   const out: PlaneShapeDto[] = [];
@@ -278,17 +257,6 @@ function normalizePlaneShapesList(raw: unknown): PlaneShapeDto[] {
     });
   }
   return out;
-}
-
-function formatGadgetCountdown(endsAtMs: number, now: number): string {
-  const msLeft = endsAtMs - now;
-  if (msLeft <= 0) return "0:00";
-  const secTotal = Math.floor(msLeft / 1000);
-  const h = Math.floor(secTotal / 3600);
-  const m = Math.floor((secTotal % 3600) / 60);
-  const s = secTotal % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 const MIN_BLOCK_WIDTH = 80;
@@ -2313,6 +2281,54 @@ export function RoomPage() {
     });
     setSelectedGadgetId(id);
     setSelectedMemeId(null);
+  }
+
+  function addBoardRandomPickGadget() {
+    if (boardFrozen || !room) return;
+    const id = `random-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const snap = planeSnapshotRef.current;
+    const pt =
+      lastBoardPointerWorldRef.current ??
+      boardViewportCenterWorld(boardViewportRef.current, snap.boardOffset, snap.boardScale);
+    setGadgets((prev) => {
+      const layerZ =
+        maxLayerZ({
+          blockMeta: planeSnapshotRef.current.blockMeta,
+          cardMeta: planeSnapshotRef.current.cardMeta,
+          gadgets: prev,
+          shapes: planeSnapshotRef.current.planeShapes,
+        }) + 1;
+      return [
+        ...prev,
+        {
+          id,
+          kind: "randomPick",
+          x: Math.max(8, pt.x),
+          y: Math.max(8, pt.y),
+          layerZ,
+        },
+      ];
+    });
+    setSelectedGadgetId(id);
+    setSelectedMemeId(null);
+  }
+
+  function runRandomPickGadget(gadgetId: string) {
+    if (boardFrozen || !room) return;
+    const names = collectRoomParticipantNames(room.cards, guestName);
+    const picked = pickRandomParticipantName(names);
+    if (!picked) {
+      window.alert("Нет имён участников: добавьте стикеры с авторами или укажите имя гостя.");
+      return;
+    }
+    setGadgets((prev) =>
+      prev.map((g) =>
+        g.id !== gadgetId || g.kind !== "randomPick"
+          ? g
+          : { ...g, pickedName: picked, pickedAtMs: Date.now() },
+      ),
+    );
+    setPlaneSaveBump((n) => n + 1);
   }
 
   function cloneSnapshot(snapshot: BoardViewSnapshot): BoardViewSnapshot {
@@ -5451,6 +5467,18 @@ export function RoomPage() {
           <button
             type="button"
             data-toolbar-action="true"
+            className={`flex h-11 w-11 items-center justify-center rounded text-lg ${
+              isLight ? "bg-zinc-100 hover:bg-zinc-200" : "bg-zinc-800 hover:bg-zinc-700"
+            }`}
+            onClick={() => addBoardRandomPickGadget()}
+            title="Случайный участник (гаджет на плоскости)"
+            aria-label="Случайный участник"
+          >
+            🎲
+          </button>
+          <button
+            type="button"
+            data-toolbar-action="true"
             className={`flex h-11 w-11 items-center justify-center rounded ${
               planeToolsOpen
                 ? isLight
@@ -5681,48 +5709,21 @@ export function RoomPage() {
             </div>
           );
         })}
-        {gadgets.map((g) => {
-          if (g.kind !== "timer") return null;
-          const sel = selectedGadgetId === g.id;
-          const done = boardNowTs >= g.endsAtMs;
-          return (
-            <div
-              key={g.id}
-              data-plane-gadget="true"
-              className={`absolute cursor-grab select-none rounded-lg border px-2 py-1.5 text-sm shadow-lg ${
-                sel ? "border-sky-500 ring-2 ring-sky-400/50" : isLight ? "border-zinc-300 bg-white/95" : "border-zinc-600 bg-zinc-900/95"
-              }`}
-              style={{ left: g.x, top: g.y, zIndex: g.layerZ ?? 340 }}
-              onMouseDown={(e) => beginGadgetDrag(e, g)}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedGadgetId(g.id);
-                setSelectedMemeId(null);
-                setSelectedShapeId(null);
-              }}
-            >
-              <div className={`text-[10px] font-semibold uppercase tracking-wide ${done ? "text-rose-500" : isLight ? "text-zinc-500" : "text-zinc-400"}`}>
-                Таймер
-              </div>
-              <div className={`font-mono text-lg tabular-nums ${done ? "text-rose-600" : isLight ? "text-zinc-900" : "text-white"}`}>
-                {formatGadgetCountdown(g.endsAtMs, boardNowTs)}
-              </div>
-              {sel && !boardFrozen ? (
-                <button
-                  type="button"
-                  className="absolute -right-2 -top-2 rounded bg-rose-600 px-1 text-[11px] text-white"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeGadget(g.id);
-                  }}
-                  title="Удалить таймер"
-                >
-                  ✕
-                </button>
-              ) : null}
-            </div>
-          );
-        })}
+        <PlaneGadgetLayer
+          gadgets={gadgets}
+          selectedGadgetId={selectedGadgetId}
+          boardFrozen={boardFrozen}
+          boardNowTs={boardNowTs}
+          isLight={isLight}
+          onSelect={(id) => {
+            setSelectedGadgetId(id);
+            setSelectedMemeId(null);
+            setSelectedShapeId(null);
+          }}
+          onRemove={removeGadget}
+          onDragStart={beginGadgetDrag}
+          onRandomPick={runRandomPickGadget}
+        />
         {blocksSorted.map((block) => {
           const copy = themePack.blocks[block.kind];
           if (!copy) return null;

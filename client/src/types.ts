@@ -21,8 +21,8 @@ export type LobbyRoomDto = {
   stickerCount: number;
 };
 
-/** Гаджет на плоскости (расширяемо позже виджетной моделью в плане). */
-export type BoardGadgetDto = {
+/** Таймер на плоскости. */
+export type BoardGadgetTimerDto = {
   id: string;
   kind: "timer";
   x: number;
@@ -30,9 +30,21 @@ export type BoardGadgetDto = {
   /** Время окончания по `Date.now()` */
   endsAtMs: number;
   label?: string;
-  /** Слой относительно блоков и стикеров на плоскости */
   layerZ?: number;
 };
+
+/** Случайный выбор участника (имена из авторов стикеров + гость). */
+export type BoardGadgetRandomPickDto = {
+  id: string;
+  kind: "randomPick";
+  x: number;
+  y: number;
+  pickedName?: string;
+  pickedAtMs?: number;
+  layerZ?: number;
+};
+
+export type BoardGadgetDto = BoardGadgetTimerDto | BoardGadgetRandomPickDto;
 
 /** Простая фигура схемы на плоскости (рамка и далее типы). */
 export type PlaneShapeDto = {

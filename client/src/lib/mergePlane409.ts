@@ -1,6 +1,7 @@
 import { mergeConnectionsById, parsePlaneConnections } from "./stickerConnections";
 import { parsePlaneCardTags } from "./stickerTags";
-import type { BoardGadgetDto, PlaneShapeDto, PlaneStateDto } from "../types";
+import { normalizeGadgetList } from "./planeGadgets";
+import type { PlaneShapeDto, PlaneStateDto } from "../types";
 
 function asRecord(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
@@ -35,33 +36,6 @@ function normalizeMeme(raw: unknown): PlaneStateDto["memes"][number] | null {
     caption: typeof m.caption === "string" ? m.caption : undefined,
     rotation: rot,
   };
-}
-
-function normalizeGadgets(raw: unknown): BoardGadgetDto[] {
-  if (!Array.isArray(raw)) return [];
-  const out: BoardGadgetDto[] = [];
-  for (const g of raw) {
-    if (!g || typeof g !== "object") continue;
-    const o = g as Record<string, unknown>;
-    if (o.kind !== "timer") continue;
-    if (typeof o.id !== "string") continue;
-    const x = Number(o.x),
-      y = Number(o.y),
-      ends = Number(o.endsAtMs);
-    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(ends)) continue;
-    const layerZ =
-      typeof o.layerZ === "number" && Number.isFinite(o.layerZ) ? o.layerZ : 320 + out.length;
-    out.push({
-      id: o.id,
-      kind: "timer",
-      x,
-      y,
-      endsAtMs: ends,
-      label: typeof o.label === "string" ? o.label : undefined,
-      layerZ,
-    });
-  }
-  return out;
 }
 
 function normalizeShapes(raw: unknown): PlaneShapeDto[] {
@@ -121,7 +95,7 @@ export function mergePlaneFor409Retry(local: PlaneStateDto, serverRaw: unknown):
   const memes = mergeById(localMemes, serverMemes, true);
 
   const localG = local.gadgets ?? [];
-  const serverG = normalizeGadgets(srv.gadgets);
+  const serverG = normalizeGadgetList(srv.gadgets);
   const gadgets = mergeById(localG, serverG, true);
 
   const localShapes = local.planeShapes ?? [];
