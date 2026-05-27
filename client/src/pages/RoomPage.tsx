@@ -1721,8 +1721,9 @@ export function RoomPage() {
     const onMouseMove = (event: MouseEvent) => {
       const drag = memeDragRef.current;
       if (!drag) return;
-      const dx = event.clientX - drag.startX;
-      const dy = event.clientY - drag.startY;
+      const sc = boardScaleRef.current || 1;
+      const dx = (event.clientX - drag.startX) / sc;
+      const dy = (event.clientY - drag.startY) / sc;
       const prevList = memesRef.current;
       const cur = prevList.find((m) => m.id === drag.memeId);
       if (!cur) return;
@@ -2253,6 +2254,8 @@ export function RoomPage() {
     event.preventDefault();
     event.stopPropagation();
     setSelectedMemeId(meme.id);
+    setSelectedGadgetId(null);
+    setSelectedShapeId(null);
     memeDragRef.current = {
       memeId: meme.id,
       mode,
@@ -4190,98 +4193,6 @@ export function RoomPage() {
           aria-hidden
         />
       ) : null}
-      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-        {memes.map((meme) => {
-          const isSelected = selectedMemeId === meme.id;
-          const rot = meme.rotation ?? 0;
-          return (
-            <div
-              key={meme.id}
-              className="pointer-events-auto absolute flex flex-col"
-              style={{ left: meme.x, top: meme.y, width: meme.width }}
-              onMouseDown={(e) => beginMemeDrag(e, meme, "move")}
-            >
-              <div className="relative" style={{ height: meme.height }}>
-                <img
-                  src={meme.src}
-                  alt="meme"
-                  draggable={false}
-                  style={{ transform: `rotate(${rot}deg)` }}
-                  className={`h-full w-full object-contain ${
-                    isSelected ? "ring-2 ring-sky-500 ring-offset-2 ring-offset-transparent" : ""
-                  }`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedMemeId(meme.id);
-                    setSelectedGadgetId(null);
-                    setSelectedShapeId(null);
-                  }}
-                />
-                {isSelected && (
-                  <>
-                    <button
-                      type="button"
-                      className="absolute -right-2 -top-2 rounded bg-rose-600 px-1.5 py-0.5 text-[11px] text-white"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeMeme(meme.id);
-                      }}
-                      title="Удалить мем"
-                    >
-                      ✕
-                    </button>
-                    <button
-                      type="button"
-                      className="absolute -left-2 -top-2 rounded bg-zinc-700 px-1.5 py-0.5 text-[11px] text-white"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setMemes((prev) =>
-                          prev.map((m) =>
-                            m.id !== meme.id
-                              ? m
-                              : { ...m, rotation: ((((m.rotation ?? 0) + 90) % 360) + 360) % 360 },
-                          ),
-                        );
-                      }}
-                      title="Повернуть на 90°"
-                    >
-                      ↻
-                    </button>
-                    <button
-                      type="button"
-                      className="absolute bottom-0 right-0 h-4 w-4 cursor-se-resize rounded bg-sky-600"
-                      onMouseDown={(e) => beginMemeDrag(e, meme, "resize")}
-                      title="Изменить размер"
-                    />
-                  </>
-                )}
-              </div>
-              {!isSelected && meme.caption ? (
-                <div
-                  className={`pointer-events-none mt-1 max-w-[280px] text-center text-[11px] leading-tight ${isLight ? "text-zinc-700" : "text-zinc-200"}`}
-                >
-                  {meme.caption}
-                </div>
-              ) : null}
-              {isSelected && (
-                <input
-                  type="text"
-                  placeholder="Подпись к картинке"
-                  maxLength={200}
-                  className={`mt-1 w-full rounded border px-1 py-0.5 text-[11px] ${isLight ? "border-zinc-300 bg-white" : "border-zinc-600 bg-zinc-900 text-white"}`}
-                  value={meme.caption ?? ""}
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setMemes((prev) => prev.map((m) => (m.id === meme.id ? { ...m, caption: v } : m)));
-                  }}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
       <header
         className={`relative z-30 shrink-0 border-b px-6 py-4 backdrop-blur ${
           isLight ? "border-zinc-300 bg-white/70" : "border-white/10 bg-black/20"
@@ -5719,6 +5630,103 @@ export function RoomPage() {
           />
             );
           })()}
+        {memes.map((meme) => {
+          const isSelected = selectedMemeId === meme.id;
+          const rot = meme.rotation ?? 0;
+          return (
+            <div
+              key={meme.id}
+              data-plane-meme="true"
+              className="absolute flex flex-col"
+              style={{
+                left: meme.x,
+                top: meme.y,
+                width: meme.width,
+                zIndex: 280,
+                pointerEvents: boardFrozen ? "none" : "auto",
+              }}
+              onMouseDown={(e) => beginMemeDrag(e, meme, "move")}
+            >
+              <div className="relative" style={{ height: meme.height }}>
+                <img
+                  src={meme.src}
+                  alt=""
+                  draggable={false}
+                  style={{ transform: `rotate(${rot}deg)` }}
+                  className={`h-full w-full object-contain ${
+                    isSelected ? "ring-2 ring-sky-500 ring-offset-2 ring-offset-transparent" : ""
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedMemeId(meme.id);
+                    setSelectedGadgetId(null);
+                    setSelectedShapeId(null);
+                  }}
+                />
+                {isSelected && !boardFrozen ? (
+                  <>
+                    <button
+                      type="button"
+                      className="absolute -right-2 -top-2 rounded bg-rose-600 px-1.5 py-0.5 text-[11px] text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeMeme(meme.id);
+                      }}
+                      title="Удалить картинку"
+                    >
+                      ✕
+                    </button>
+                    <button
+                      type="button"
+                      className="absolute -left-2 -top-2 rounded bg-zinc-700 px-1.5 py-0.5 text-[11px] text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMemes((prev) =>
+                          prev.map((m) =>
+                            m.id !== meme.id
+                              ? m
+                              : { ...m, rotation: ((((m.rotation ?? 0) + 90) % 360) + 360) % 360 },
+                          ),
+                        );
+                      }}
+                      title="Повернуть на 90°"
+                    >
+                      ↻
+                    </button>
+                    <button
+                      type="button"
+                      className="absolute bottom-0 right-0 h-4 w-4 cursor-se-resize rounded bg-sky-600"
+                      onMouseDown={(e) => beginMemeDrag(e, meme, "resize")}
+                      title="Изменить размер"
+                    />
+                  </>
+                ) : null}
+              </div>
+              {!isSelected && meme.caption ? (
+                <div
+                  className={`pointer-events-none mt-1 max-w-[280px] text-center text-[11px] leading-tight ${isLight ? "text-zinc-700" : "text-zinc-200"}`}
+                >
+                  {meme.caption}
+                </div>
+              ) : null}
+              {isSelected && !boardFrozen ? (
+                <input
+                  type="text"
+                  placeholder="Подпись к картинке"
+                  maxLength={200}
+                  className={`mt-1 w-full rounded border px-1 py-0.5 text-[11px] ${isLight ? "border-zinc-300 bg-white" : "border-zinc-600 bg-zinc-900 text-white"}`}
+                  value={meme.caption ?? ""}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setMemes((prev) => prev.map((m) => (m.id === meme.id ? { ...m, caption: v } : m)));
+                  }}
+                />
+              ) : null}
+            </div>
+          );
+        })}
         {planeShapesSorted.map((shape) => {
           if (shape.kind !== "frame") return null;
           const sel = selectedShapeId === shape.id;
