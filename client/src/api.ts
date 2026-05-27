@@ -224,6 +224,23 @@ export async function patchPlaneState(
   return res.json() as Promise<{ planeVersion: number; planeState: unknown }>;
 }
 
+export async function uploadPlaneImage(
+  slug: string,
+  file: File,
+): Promise<{ id: string; ext: string; url: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await apiFetch(`/api/rooms/${encodeURIComponent(slug)}/plane-images`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? res.statusText);
+  }
+  return res.json() as Promise<{ id: string; ext: string; url: string }>;
+}
+
 export async function createActionItem(slug: string, body: { text: string }): Promise<{
   actionItem: RoomDto["actionItems"][number];
 }> {

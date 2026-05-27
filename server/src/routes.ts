@@ -11,6 +11,7 @@ import { roomAccessStatus } from "./roomAccess.js";
 import { registerAdminNotificationRoutes } from "./admin/notificationRoutes.js";
 import { registerChatRoutes } from "./chat/chatRoutes.js";
 import { notifyRetroEndedBySlug } from "./notifications/retroEndedEmail.js";
+import { registerPlaneImageRoutes } from "./plane/planeImageRoutes.js";
 import {
   createRoom,
   createCard,
@@ -46,6 +47,7 @@ export async function registerRoutes(app: FastifyInstance, io: Server) {
   registerAuthRoutes(app);
   registerAdminNotificationRoutes(app);
   registerChatRoutes(app, io);
+  registerPlaneImageRoutes(app, roomUnlockPre);
 
   app.post<{
     Body: { theme?: string; kind?: string; listedInLobby?: boolean; joinPassword?: string };

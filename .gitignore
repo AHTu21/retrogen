@@ -10,6 +10,7 @@ Thumbs.db
 .vite
 server/prisma/*.db
 server/prisma/*.db-journal
+server/data/
 
 # IDE (личные настройки не коммитим; общие расширения — по желанию)
 .idea/

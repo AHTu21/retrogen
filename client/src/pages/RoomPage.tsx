@@ -20,6 +20,7 @@ import {
   logoutAccount,
   patchRoomAccess,
   patchPlaneState,
+  uploadPlaneImage,
   resetRoom,
   toggleCardReaction,
   updateCard,
@@ -78,6 +79,11 @@ import { planeStateFingerprint } from "../lib/planeFingerprint";
 import { mergePlaneFor409Retry } from "../lib/mergePlane409";
 import { boardPointFromClient, boardViewportCenterWorld, worldSizeFromCssPixels } from "../lib/boardPlaneCoords";
 import { tryEmitPlaneLivePreview } from "../lib/planeLivePreview";
+import {
+  loadSnapToGridEnabled,
+  saveSnapToGridEnabled,
+  snapPlaneCoord,
+} from "../lib/planeGrid";
 import { createAppSocket } from "../lib/socketClient";
 import { getRoomUnlockToken } from "../lib/roomUnlockStorage";
 import { recordRoomVisit } from "../lib/roomLobbyPrefs";
@@ -548,6 +554,8 @@ export function RoomPage() {
   const [participantKey, setParticipantKey] = useState("");
   const [memes, setMemes] = useState<MemeItem[]>([]);
   const [gadgets, setGadgets] = useState<BoardGadgetDto[]>([]);
+  const [snapToGrid, setSnapToGrid] = useState(loadSnapToGridEnabled);
+  const snapToGridRef = useRef(snapToGrid);
   const [planeShapes, setPlaneShapes] = useState<PlaneShapeDto[]>([]);
   const [cardStyles, setCardStyles] = useState<Record<string, { backgroundColor?: string }>>({});
   const [blockStyles, setBlockStyles] = useState<Record<string, { backgroundColor?: string }>>({});
@@ -828,6 +836,7 @@ export function RoomPage() {
   slugRef.current = slug;
   memesRef.current = memes;
   gadgetsRef.current = gadgets;
+  snapToGridRef.current = snapToGrid;
   planeShapesRef.current = planeShapes;
   boardScaleRef.current = boardScale;
 
@@ -1732,6 +1741,16 @@ export function RoomPage() {
     };
     const onMouseUp = () => {
       if (memeDragRef.current) {
+        if (snapToGridRef.current) {
+          const memeId = memeDragRef.current.memeId;
+          setMemes((prev) =>
+            prev.map((m) =>
+              m.id !== memeId
+                ? m
+                : { ...m, x: snapPlaneCoord(m.x, true), y: snapPlaneCoord(m.y, true) },
+            ),
+          );
+        }
         planeDragEndedFlushRef.current = true;
         setPlaneSaveBump((n) => n + 1);
       }
@@ -1766,6 +1785,16 @@ export function RoomPage() {
     };
     const onMouseUp = () => {
       if (gadgetDragRef.current) {
+        if (snapToGridRef.current) {
+          const gadgetId = gadgetDragRef.current.gadgetId;
+          setGadgets((prev) =>
+            prev.map((g) =>
+              g.id !== gadgetId
+                ? g
+                : { ...g, x: snapPlaneCoord(g.x, true), y: snapPlaneCoord(g.y, true) },
+            ),
+          );
+        }
         planeDragEndedFlushRef.current = true;
         setPlaneSaveBump((n) => n + 1);
       }
@@ -2651,24 +2680,42 @@ export function RoomPage() {
     setPendingStickerPlacement(true);
   }
 
-  function onSelectImageFile(event: ChangeEvent<HTMLInputElement>) {
+  async function onSelectImageFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const src = typeof reader.result === "string" ? reader.result : "";
-      if (!src) return;
-      const id = `meme-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const snap = planeSnapshotRef.current;
-      const pt =
-        lastBoardPointerWorldRef.current ??
-        boardViewportCenterWorld(boardViewportRef.current, snap.boardOffset, snap.boardScale);
-      const { width, height } = worldSizeFromCssPixels(260, 180, snap.boardScale);
-      setMemes((prev) => [...prev, { id, src, x: Math.max(0, pt.x - width / 2), y: Math.max(0, pt.y - height / 2), width, height }]);
-      setSelectedMemeId(id);
-      if (imageInputRef.current) imageInputRef.current.value = "";
-    };
-    reader.readAsDataURL(file);
+    let src = "";
+    if (slug) {
+      try {
+        const uploaded = await uploadPlaneImage(slug, file);
+        src = uploaded.url;
+      } catch {
+        /* fallback below */
+      }
+    }
+    if (!src) {
+      src = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+    }
+    if (!src) return;
+    const id = `meme-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const snap = planeSnapshotRef.current;
+    const pt =
+      lastBoardPointerWorldRef.current ??
+      boardViewportCenterWorld(boardViewportRef.current, snap.boardOffset, snap.boardScale);
+    const { width, height } = worldSizeFromCssPixels(260, 180, snap.boardScale);
+    let x = Math.max(0, pt.x - width / 2);
+    let y = Math.max(0, pt.y - height / 2);
+    if (snapToGrid) {
+      x = snapPlaneCoord(x, true);
+      y = snapPlaneCoord(y, true);
+    }
+    setMemes((prev) => [...prev, { id, src, x, y, width, height }]);
+    setSelectedMemeId(id);
+    if (imageInputRef.current) imageInputRef.current.value = "";
   }
 
   function formatSticker(cardId: string, command: string, value?: string) {
@@ -5447,6 +5494,31 @@ export function RoomPage() {
               <circle cx="12" cy="12" r="9" />
               <path d="M12 7v6l4 2" strokeLinecap="round" />
             </svg>
+          </button>
+          <button
+            type="button"
+            data-toolbar-action="true"
+            className={`flex h-11 w-11 items-center justify-center rounded font-mono text-sm ${
+              snapToGrid
+                ? isLight
+                  ? "bg-sky-200 ring-2 ring-sky-500"
+                  : "bg-sky-900/70 ring-2 ring-sky-400"
+                : isLight
+                  ? "bg-zinc-100 hover:bg-zinc-200"
+                  : "bg-zinc-800 hover:bg-zinc-700"
+            }`}
+            onClick={() => {
+              setSnapToGrid((prev) => {
+                const next = !prev;
+                saveSnapToGridEnabled(next);
+                return next;
+              });
+            }}
+            title="Привязка к сетке 16px (картинки и гаджеты при отпускании)"
+            aria-label="Привязка к сетке"
+            aria-pressed={snapToGrid}
+          >
+            ⊞
           </button>
           <button
             type="button"
