@@ -2,12 +2,16 @@ import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
 import { roomAccessStatus } from "./roomAccess.js";
 import { registerStickerCollabHandlers } from "./stickerCollabSocket.js";
+import { registerChatSocketHandlers } from "./chat/chatSocket.js";
 
 function reqLikeFromHandshake(socket: {
   handshake: { headers: Record<string, string | string[] | undefined>; auth?: Record<string, unknown> };
 }) {
   const h: Record<string, string | string[] | undefined> = { ...socket.handshake.headers };
-  const auth = socket.handshake.auth as { roomUnlockToken?: string } | undefined;
+  const auth = socket.handshake.auth as { token?: string; roomUnlockToken?: string } | undefined;
+  if (auth?.token) {
+    h.authorization = `Bearer ${auth.token}`;
+  }
   if (auth?.roomUnlockToken) {
     h["x-room-unlock-token"] = auth.roomUnlockToken;
   }
@@ -21,6 +25,7 @@ export function attachSocket(httpServer: HttpServer) {
   });
 
   registerStickerCollabHandlers(io);
+  registerChatSocketHandlers(io);
 
   io.on("connection", (socket) => {
     socket.on("join", async (slug: string, ack?: (err: Error | null) => void) => {

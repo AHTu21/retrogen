@@ -8,6 +8,7 @@ import { RoomTeamPage } from "./pages/RoomTeamPage";
 import { SummaryPage } from "./pages/SummaryPage";
 import { WelcomePage } from "./pages/WelcomePage";
 import { WorkshopPage } from "./pages/WorkshopPage";
+import { MessagesPage } from "./pages/MessagesPage";
 
 export default function App() {
   return (
@@ -18,6 +19,8 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/workshop" element={<WorkshopPage />} />
+      <Route path="/messages" element={<MessagesPage />} />
+      <Route path="/messages/:chatId" element={<MessagesPage />} />
       <Route path="/r/:slug/summary" element={<SummaryPage />} />
       <Route path="/r/:slug/team" element={<RoomTeamPage />} />
       <Route path="/r/:slug" element={<RoomPage />} />
