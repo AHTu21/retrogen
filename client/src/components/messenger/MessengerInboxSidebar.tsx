@@ -1,22 +1,94 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
 import type { AuthUserDto } from "../../api";
 import {
+  createChannelChat,
   createDirectChat,
   createGroupChat,
   searchMessengerUsers,
   updateAuthDisplayName,
 } from "../../api";
-import { loadProfilePrefs, saveProfilePrefs } from "../../lib/profilePrefs";
+import { readImageDataUrlFromFile } from "../../lib/messengerAvatar";
+import { getMessengerModalPortalRoot } from "../../lib/messengerModalPortal";
+import { MessengerModalBackdrop } from "./MessengerModalBackdrop";
+import {
+  avatarShapeClass,
+  avatarShapeStyle,
+  heroCardStyle,
+  isPanelThemeDefault,
+  loadMessengerProfileAppearance,
+  nameScaleClass,
+  profilePanelStyle,
+  saveMessengerProfileAppearance,
+  settingsButtonRowStyle,
+  type MessengerProfileAppearance,
+  type MessengerSettingsButtonId,
+} from "../../lib/messengerProfileAppearance";
+import { genderDisplayLabel } from "../../lib/profileFormFields";
+import { loadProfilePrefs, type UserProfilePrefs } from "../../lib/profilePrefs";
+import { MessengerProfileAppearanceModal } from "./MessengerProfileAppearanceModal";
+import { MessengerProfileSettingsModal } from "./MessengerProfileSettingsModal";
+import { MessengerProfileDetailsModal } from "./MessengerProfileDetailsModal";
+import { useProfilePrefsSync } from "../../lib/useProfilePrefsSync";
 import type { ChatListItemDto } from "../../types/messenger";
+import { MESSENGER_CHAT_EMOJI, pickMessengerEmoji } from "../../lib/messengerEmoji";
+import {
+  IconMegaphone,
+  IconPencil,
+  IconSettings,
+  IconSmile,
+  IconUser,
+  IconUsers,
+  IconUsersPlus,
+} from "./MessageComposerIcons";
 
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
+const PROFILE_STATUS_EMOJI = [
+  "",
+  ...new Set([
+    "🙂",
+    "😊",
+    "😎",
+    "😀",
+    "🥳",
+    "😴",
+    "🤔",
+    "😮",
+    "😍",
+    "🤗",
+    "🫡",
+    "🔥",
+    "✨",
+    "💯",
+    "❤️",
+    "💼",
+    "🎮",
+    "☕",
+    "🍕",
+    "🏠",
+    "🌙",
+    "🌧️",
+    "✈️",
+    "🎉",
+    "💬",
+    "👋",
+    "🙌",
+    "👀",
+    "📵",
+    "🤒",
+    "📌",
+    "🛠️",
+    "📢",
+    "🐛",
+    "💪",
+    "🎊",
+    "😡",
+    "🤷",
+    ...MESSENGER_CHAT_EMOJI,
+  ]),
+];
+
+type RailPanel = "profile" | "contacts" | "newGroup" | "newChannel" | "settings";
 
 function userInitials(name: string, email: string): string {
   const n = name.trim();
@@ -53,359 +125,1019 @@ export function MessengerInboxSidebar({
   onSelectChat,
   onChatsChanged,
 }: MessengerInboxSidebarProps) {
-  const [sideOpen, setSideOpen] = useState(false);
-  const [profilePrefs, setProfilePrefs] = useState(() => loadProfilePrefs());
-  const [fullName, setFullName] = useState(
-    () => loadProfilePrefs().displayName || me.displayName || "",
-  );
-  const [savingName, setSavingName] = useState(false);
-  const [showNewGroup, setShowNewGroup] = useState(false);
+  const { prefs: profilePrefs, commit: commitProfilePrefs, refresh: refreshProfilePrefs } =
+    useProfilePrefsSync();
+  const [railPanel, setRailPanel] = useState<RailPanel | null>(null);
+  const [profileDraft, setProfileDraft] = useState<UserProfilePrefs | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [groupTitle, setGroupTitle] = useState("");
+  const [channelTitle, setChannelTitle] = useState("");
+  const [channelDescription, setChannelDescription] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [avatarZoomOpen, setAvatarZoomOpen] = useState(false);
+  const [messengerAppearance, setMessengerAppearance] = useState(loadMessengerProfileAppearance);
+  const [profileAppearanceOpen, setProfileAppearanceOpen] = useState(false);
+  const commitMessengerAppearance = (next: MessengerProfileAppearance) => {
+    setMessengerAppearance(saveMessengerProfileAppearance(next));
+  };
+  const [createLoading, setCreateLoading] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const inboxContentRef = useRef<HTMLDivElement>(null);
 
   const displayName =
     profilePrefs.displayName.trim() || me.displayName.trim() || me.email;
   const hasAvatar = !!profilePrefs.avatarDataUrl;
   const savedChat = chats.find((c) => c.isSaved === true);
+  const directChats = chats.filter((c) => c.kind === "direct" && !c.isSaved);
+  const visibleChats = chats.filter((c) => !c.isSaved);
 
   useEffect(() => {
-    if (!sideOpen) setAvatarZoomOpen(false);
-  }, [sideOpen]);
-
-  function toggleAvatarZoom() {
-    if (!hasAvatar) return;
-    setAvatarZoomOpen((o) => !o);
-  }
-
-  async function onAvatarPick(file: File | undefined) {
-    if (!file || !file.type.startsWith("image/")) return;
-    try {
-      const dataUrl = await fileToDataUrl(file);
-      const next = saveProfilePrefs({ ...loadProfilePrefs(), avatarDataUrl: dataUrl });
-      setProfilePrefs(next);
-    } catch {
-      /* ignore */
+    if (railPanel !== "profile") {
+      setProfileAppearanceOpen(false);
+      setAvatarZoomOpen(false);
+      setProfileDraft(null);
     }
+  }, [railPanel]);
+
+  function togglePanel(id: RailPanel) {
+    setRailPanel((cur) => {
+      const next = cur === id ? null : id;
+      if (next === "profile") {
+        refreshProfilePrefs();
+        setProfileDraft({ ...loadProfilePrefs() });
+      }
+      return next;
+    });
   }
 
-  async function saveFullName() {
-    const name = fullName.trim().slice(0, 120);
-    if (!name) return;
-    setSavingName(true);
+  function onAvatarPick(file: File | undefined) {
+    readImageDataUrlFromFile(
+      file,
+      (url) => {
+        const next = commitProfilePrefs({ ...profilePrefs, avatarDataUrl: url });
+        setProfileDraft((d) => (d ? { ...d, avatarDataUrl: next.avatarDataUrl } : d));
+      },
+      (msg) => window.alert(msg),
+    );
+  }
+
+  async function saveProfileFromMessenger(draftOverride?: UserProfilePrefs) {
+    const d = draftOverride ?? profileDraft;
+    if (!d) return;
+    setSavingProfile(true);
     try {
-      const user = await updateAuthDisplayName(name);
-      const next = saveProfilePrefs({ ...loadProfilePrefs(), displayName: name });
-      setProfilePrefs(next);
-      onMeUpdated(user);
-    } catch {
-      const next = saveProfilePrefs({ ...loadProfilePrefs(), displayName: name });
-      setProfilePrefs(next);
+      const name = d.displayName.trim().slice(0, 120);
+      if (name) {
+        try {
+          const user = await updateAuthDisplayName(name);
+          onMeUpdated(user);
+        } catch {
+          /* local only */
+        }
+      }
+      const saved = commitProfilePrefs({ ...d, displayName: name || d.displayName });
+      setProfileDraft(saved);
     } finally {
-      setSavingName(false);
+      setSavingProfile(false);
     }
   }
 
-  const railBtn = `flex size-10 items-center justify-center rounded-lg transition-colors ${
-    isLight ? "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+  const railBtn = `flex size-10 items-center justify-center rounded-lg transition-[color,background-color,box-shadow,transform] duration-200 ease-out ${
+    isLight
+      ? "text-zinc-600 hover:bg-white/70 hover:text-zinc-900"
+      : "text-zinc-400 hover:bg-zinc-800/90 hover:text-zinc-100"
   }`;
   const railBtnActive = isLight
-    ? "bg-sky-50 text-sky-700"
-    : "bg-sky-950/50 text-sky-300";
+    ? "bg-white text-sky-700 shadow-sm ring-1 ring-sky-200/80"
+    : "bg-zinc-800 text-sky-300 ring-1 ring-sky-500/30";
+
+  const inputClass = `w-full rounded-lg border px-2 py-1.5 text-sm ${
+    isLight ? "border-zinc-300 bg-white" : "border-zinc-600 bg-zinc-800"
+  }`;
+
+  const panelOpen = railPanel !== null;
+  const railSurface = isLight
+    ? "border-zinc-300/90 bg-zinc-100 shadow-[2px_0_12px_rgba(15,23,42,0.06)]"
+    : "border-zinc-600 bg-zinc-950 shadow-[2px_0_16px_rgba(0,0,0,0.35)]";
+  const profileBgStyle = profilePanelStyle(messengerAppearance);
+  const profileCustomBg = railPanel === "profile" && !isPanelThemeDefault(messengerAppearance);
+  const chatsSurface = isLight ? "bg-white" : "bg-zinc-900/80";
+  const panelSurface = isLight ? "bg-white" : "bg-zinc-900";
+  const panelTransition =
+    "transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]";
 
   return (
-    <aside className={`flex min-h-0 w-full max-w-xs shrink-0 ${panelClass}`}>
+    <aside className={`flex min-h-0 w-[22.5rem] max-w-[min(100%,22.5rem)] shrink-0 overflow-hidden ${panelClass}`}>
+      <MessengerProfileAppearanceModal
+        open={profileAppearanceOpen}
+        isLight={isLight}
+        applied={messengerAppearance}
+        onClose={() => setProfileAppearanceOpen(false)}
+        onApply={(next) => {
+          commitMessengerAppearance(next);
+          setProfileAppearanceOpen(false);
+        }}
+      />
       <nav
-        className={`flex w-12 shrink-0 flex-col items-center gap-1 border-r py-2 ${
-          isLight ? "border-zinc-200" : "border-zinc-700"
-        }`}
+        className={`relative z-10 flex w-[3.25rem] shrink-0 flex-col items-center gap-1 border-r py-2 ${railSurface}`}
+        aria-label="Меню сообщений"
       >
-        <button
-          type="button"
-          title="Профиль и действия"
-          className={`${railBtn} ${sideOpen ? railBtnActive : ""}`}
-          onClick={() => setSideOpen((o) => !o)}
+        <RailIconButton
+          title="Профиль"
+          active={railPanel === "profile"}
+          className={railBtn}
+          activeClass={railBtnActive}
+          onClick={() => togglePanel("profile")}
         >
-          {profilePrefs.avatarDataUrl ? (
+          {hasAvatar ? (
             <img
-              src={profilePrefs.avatarDataUrl}
+              src={profilePrefs.avatarDataUrl!}
               alt=""
               className="size-8 rounded-full object-cover"
             />
           ) : (
-            <span
-              className={`flex size-8 items-center justify-center rounded-full text-xs font-semibold ${
-                isLight ? "bg-zinc-200 text-zinc-700" : "bg-zinc-700 text-zinc-200"
-              }`}
-            >
-              {userInitials(displayName, me.email)}
-            </span>
+            <IconUser className="size-5" />
           )}
-        </button>
+        </RailIconButton>
+
+        <RailIconButton
+          title="Контакты"
+          active={railPanel === "contacts"}
+          className={railBtn}
+          activeClass={railBtnActive}
+          onClick={() => togglePanel("contacts")}
+        >
+          <IconUsers className="size-5" />
+        </RailIconButton>
+
+        <RailIconButton
+          title="Создать группу"
+          active={railPanel === "newGroup"}
+          className={railBtn}
+          activeClass={railBtnActive}
+          onClick={() => togglePanel("newGroup")}
+        >
+          <IconUsersPlus className="size-5" />
+        </RailIconButton>
+
+        <RailIconButton
+          title="Создать канал"
+          active={railPanel === "newChannel"}
+          className={railBtn}
+          activeClass={railBtnActive}
+          onClick={() => togglePanel("newChannel")}
+        >
+          <IconMegaphone className="size-5" />
+        </RailIconButton>
+
+        <RailIconButton
+          title="Настройки"
+          active={railPanel === "settings"}
+          className={railBtn}
+          activeClass={railBtnActive}
+          onClick={() => togglePanel("settings")}
+        >
+          <IconSettings className="size-5" />
+        </RailIconButton>
+
         {savedChat ? (
-          <button
-            type="button"
+          <RailIconButton
             title="Избранное"
-            className={`${railBtn} ${activeChatId === savedChat.id ? railBtnActive : ""}`}
+            active={activeChatId === savedChat.id}
+            className={railBtn}
+            activeClass={railBtnActive}
             onClick={() => {
               onSelectChat(savedChat.id);
-              setSideOpen(false);
+              setRailPanel(null);
             }}
           >
             <span className="text-lg leading-none" aria-hidden>
               ★
             </span>
-          </button>
+          </RailIconButton>
         ) : null}
       </nav>
 
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-        {sideOpen ? (
-          <div
-            className={`relative z-20 shrink-0 border-b p-3 ${
-              isLight ? "border-zinc-200 bg-white shadow-sm" : "border-zinc-700 bg-zinc-900 shadow-md shadow-black/20"
-            }`}
-          >
-            <div className="flex gap-3">
-              <div className="flex shrink-0 flex-col items-center gap-1.5">
-                <button
-                  type="button"
-                  className={`block overflow-hidden rounded-full ring-1 ring-black/10 transition-transform ${
-                    hasAvatar ? "cursor-zoom-in hover:ring-sky-400/50" : "cursor-default"
-                  } ${avatarZoomOpen ? "ring-2 ring-sky-500" : ""}`}
-                  onClick={toggleAvatarZoom}
-                  title={hasAvatar ? "Увеличить фото" : undefined}
-                  disabled={!hasAvatar}
-                >
-                  {hasAvatar ? (
-                    <img
-                      src={profilePrefs.avatarDataUrl!}
-                      alt=""
-                      className="size-14 object-cover"
-                    />
-                  ) : (
-                    <span
-                      className={`flex size-14 items-center justify-center text-lg font-semibold ${
-                        isLight ? "bg-zinc-200 text-zinc-700" : "bg-zinc-700 text-zinc-200"
-                      }`}
-                    >
-                      {userInitials(displayName, me.email)}
-                    </span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  className={`text-[11px] font-medium underline-offset-2 hover:underline ${
-                    isLight ? "text-sky-700" : "text-sky-400"
-                  }`}
-                  onClick={() => avatarInputRef.current?.click()}
-                >
-                  Загрузить фото
-                </button>
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="sr-only"
-                  onChange={(e) => {
-                    void onAvatarPick(e.target.files?.[0]);
-                    e.target.value = "";
-                  }}
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide opacity-50">
-                  ФИО
-                </label>
-                <input
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Фамилия Имя Отчество"
-                  className={`mb-1 w-full rounded-lg border px-2 py-1.5 text-sm ${
-                    isLight ? "border-zinc-300 bg-white" : "border-zinc-600 bg-zinc-800"
-                  }`}
-                />
-                <button
-                  type="button"
-                  disabled={savingName || !fullName.trim()}
-                  onClick={() => void saveFullName()}
-                  className="text-xs font-medium text-sky-600 disabled:opacity-40"
-                >
-                  {savingName ? "Сохранение…" : "Сохранить имя"}
-                </button>
-                <p className="mt-1 truncate text-[11px] opacity-50">{me.email}</p>
-              </div>
-            </div>
-
-            <div className="mt-3 flex flex-col gap-2">
-              {savedChat ? (
-                <button
-                  type="button"
-                  className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
-                    isLight
-                      ? "border-amber-200 bg-amber-50 hover:bg-amber-100"
-                      : "border-amber-800/50 bg-amber-950/30 hover:bg-amber-900/40"
-                  }`}
-                  onClick={() => {
-                    onSelectChat(savedChat.id);
-                    setSideOpen(false);
-                  }}
-                >
-                  <span className="font-medium">★ Избранное</span>
-                  <span className="mt-0.5 block text-xs opacity-60">
-                    Заметки и пересланные сообщения
-                  </span>
-                </button>
-              ) : null}
-
-              <button
-                type="button"
-                className={`w-full rounded-lg border px-3 py-2 text-sm font-medium ${
-                  isLight
-                    ? "border-zinc-300 bg-white hover:bg-zinc-50"
-                    : "border-zinc-600 bg-zinc-800 hover:bg-zinc-700"
-                }`}
-                onClick={() => setShowNewGroup((v) => !v)}
-              >
-                {showNewGroup ? "Скрыть форму группы" : "Создать группу"}
-              </button>
-              {showNewGroup ? (
-                <form
-                  className="flex flex-col gap-1"
-                  onSubmit={async (ev) => {
-                    ev.preventDefault();
-                    try {
-                      const { chat } = await createGroupChat(groupTitle, []);
-                      setGroupTitle("");
-                      setShowNewGroup(false);
-                      await onChatsChanged();
-                      onSelectChat(chat.id);
-                      setSideOpen(false);
-                    } catch {
-                      /* ignore */
-                    }
-                  }}
-                >
-                  <input
-                    value={groupTitle}
-                    onChange={(e) => setGroupTitle(e.target.value)}
-                    placeholder="Название группы"
-                    className={`rounded-lg border px-2 py-1.5 text-sm ${
-                      isLight ? "border-zinc-300" : "border-zinc-600 bg-zinc-800"
-                    }`}
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white"
-                  >
-                    Создать
-                  </button>
-                </form>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-
+      <div
+        ref={inboxContentRef}
+        className={`relative flex min-h-0 min-w-0 flex-1 flex-col border-l ${
+          isLight ? "border-zinc-200/90" : "border-zinc-700/80"
+        } ${chatsSurface}`}
+      >
         <div
-          className={`relative flex min-h-0 flex-1 flex-col transition-[opacity,filter] duration-200 ease-out ${
-            sideOpen ? "opacity-[0.22] saturate-50 blur-[0.4px]" : "opacity-100 saturate-100 blur-0"
+          className={`absolute inset-0 z-20 flex min-h-0 flex-col overflow-hidden p-3 ${panelTransition} ${
+            profileCustomBg ? "" : panelSurface
+          } ${
+            panelOpen && railPanel
+              ? "translate-x-0 opacity-100"
+              : "pointer-events-none translate-x-3 opacity-0"
           }`}
-          aria-hidden={sideOpen}
+          style={profileCustomBg ? profileBgStyle : undefined}
+          aria-hidden={!panelOpen}
         >
-          {sideOpen ? (
-            <button
-              type="button"
-              className="absolute inset-0 z-10 cursor-default"
-              aria-label="Закрыть профиль"
-              onClick={() => setSideOpen(false)}
-            />
-          ) : null}
+          {railPanel ? (
+            <>
+                <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">
+                    {railPanel === "profile"
+                      ? "Профиль"
+                      : railPanel === "contacts"
+                        ? "Контакты"
+                        : railPanel === "newGroup"
+                          ? "Новая группа"
+                          : railPanel === "newChannel"
+                            ? "Новый канал"
+                            : "Настройки"}
+                  </h3>
+                  <button
+                    type="button"
+                    className="rounded-md p-1.5 opacity-60 transition-opacity hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10"
+                    onClick={() => setRailPanel(null)}
+                    aria-label="Закрыть"
+                  >
+                    {railPanel === "profile" ? (
+                      <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                        <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+                      </svg>
+                    ) : (
+                      <span className="px-1 text-xs">Закрыть</span>
+                    )}
+                  </button>
+                </div>
 
-        <div className={`border-b p-3 ${sideOpen ? "pointer-events-none" : ""}`}>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide opacity-60">Новый диалог</p>
-          <input
-            type="search"
-            placeholder="Email или имя…"
-            value={userSearch}
-            onChange={(e) => setUserSearch(e.target.value)}
-            className={`w-full rounded-lg border px-2 py-1.5 text-sm ${
-              isLight ? "border-zinc-300" : "border-zinc-600 bg-zinc-800"
-            }`}
-          />
-          <UserSearchHits
-            query={userSearch}
-            onPick={async (userId) => {
-              try {
-                const { chat } = await createDirectChat(userId);
-                setUserSearch("");
-                await onChatsChanged();
-                onSelectChat(chat.id);
-              } catch {
-                /* ignore */
-              }
-            }}
-          />
+                {railPanel === "profile" && profileDraft ? (
+                  <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+                    <ProfilePanel
+                      isLight={isLight}
+                      me={me}
+                      displayName={displayName}
+                      draft={profileDraft}
+                      setDraft={setProfileDraft}
+                      hasAvatar={hasAvatar}
+                      avatarZoomOpen={avatarZoomOpen}
+                      onToggleZoom={() => hasAvatar && setAvatarZoomOpen((o) => !o)}
+                      onPickAvatar={() => avatarInputRef.current?.click()}
+                      avatarInputRef={avatarInputRef}
+                      onAvatarFile={onAvatarPick}
+                      inputClass={inputClass}
+                      boundsRef={inboxContentRef}
+                      appearance={messengerAppearance}
+                      onOpenAppearance={() => setProfileAppearanceOpen(true)}
+                      saving={savingProfile}
+                      onSave={(draft) => void saveProfileFromMessenger(draft)}
+                    />
+                  </div>
+                ) : null}
+
+                {railPanel === "contacts" ? (
+              <ContactsPanel
+                directChats={directChats}
+                activeChatId={activeChatId}
+                userSearch={userSearch}
+                setUserSearch={setUserSearch}
+                inputClass={inputClass}
+                isLight={isLight}
+                onSelectChat={(id) => {
+                  onSelectChat(id);
+                  setRailPanel(null);
+                }}
+                onPickUser={async (userId) => {
+                  try {
+                    const { chat } = await createDirectChat(userId);
+                    setUserSearch("");
+                    await onChatsChanged();
+                    onSelectChat(chat.id);
+                    setRailPanel(null);
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+              />
+            ) : null}
+
+            {railPanel === "newGroup" ? (
+              <form
+                className="flex flex-col gap-2"
+                onSubmit={async (ev) => {
+                  ev.preventDefault();
+                  setCreateLoading(true);
+                  try {
+                    const { chat } = await createGroupChat(groupTitle, []);
+                    setGroupTitle("");
+                    await onChatsChanged();
+                    onSelectChat(chat.id);
+                    setRailPanel(null);
+                  } catch {
+                    /* ignore */
+                  } finally {
+                    setCreateLoading(false);
+                  }
+                }}
+              >
+                <input
+                  value={groupTitle}
+                  onChange={(e) => setGroupTitle(e.target.value)}
+                  placeholder="Название группы"
+                  className={inputClass}
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={createLoading || !groupTitle.trim()}
+                  className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+                >
+                  {createLoading ? "Создание…" : "Создать группу"}
+                </button>
+              </form>
+            ) : null}
+
+            {railPanel === "newChannel" ? (
+              <form
+                className="flex flex-col gap-2"
+                onSubmit={async (ev) => {
+                  ev.preventDefault();
+                  setCreateLoading(true);
+                  try {
+                    const { chat } = await createChannelChat(channelTitle, channelDescription);
+                    setChannelTitle("");
+                    setChannelDescription("");
+                    await onChatsChanged();
+                    onSelectChat(chat.id);
+                    setRailPanel(null);
+                  } catch {
+                    /* ignore */
+                  } finally {
+                    setCreateLoading(false);
+                  }
+                }}
+              >
+                <input
+                  value={channelTitle}
+                  onChange={(e) => setChannelTitle(e.target.value)}
+                  placeholder="Название канала"
+                  className={inputClass}
+                  required
+                />
+                <textarea
+                  value={channelDescription}
+                  onChange={(e) => setChannelDescription(e.target.value)}
+                  placeholder="Описание (необязательно)"
+                  rows={2}
+                  className={inputClass}
+                />
+                <button
+                  type="submit"
+                  disabled={createLoading || !channelTitle.trim()}
+                  className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+                >
+                  {createLoading ? "Создание…" : "Создать канал"}
+                </button>
+              </form>
+            ) : null}
+
+            {railPanel === "settings" ? (
+              <div className="flex flex-col gap-2 text-sm">
+                <p className="text-xs opacity-60">
+                  Оформление доски, безопасность и расширенные параметры — в центре настроек профиля.
+                </p>
+                <Link
+                  to="/profile"
+                  className={`rounded-lg border px-3 py-2 text-center font-medium ${
+                    isLight
+                      ? "border-zinc-300 hover:bg-zinc-50"
+                      : "border-zinc-600 hover:bg-zinc-800"
+                  }`}
+                  onClick={() => setRailPanel(null)}
+                >
+                  Открыть настройки профиля
+                </Link>
+                <Link
+                  to="/profile#identity"
+                  className={`rounded-lg border px-3 py-2 text-center ${
+                    isLight
+                      ? "border-zinc-300 hover:bg-zinc-50"
+                      : "border-zinc-600 hover:bg-zinc-800"
+                  }`}
+                  onClick={() => setRailPanel(null)}
+                >
+                  Личные данные
+                </Link>
+              </div>
+            ) : null}
+            </>
+          ) : null}
         </div>
 
-        <div className={`min-h-0 flex-1 overflow-y-auto ${sideOpen ? "pointer-events-none" : ""}`}>
-          {loadingChats ? <p className="p-3 text-sm opacity-60">Загрузка чатов…</p> : null}
-          {chats.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => onSelectChat(c.id)}
-              className={`flex w-full flex-col gap-0.5 border-b px-3 py-2.5 text-left text-sm ${
-                activeChatId === c.id
-                  ? isLight
-                    ? "bg-sky-50"
-                    : "bg-sky-950/40"
-                  : isLight
-                    ? "hover:bg-zinc-50"
-                    : "hover:bg-zinc-800/50"
-              }`}
-            >
-              <span className="flex items-center justify-between gap-2">
-                <span className="truncate font-medium">
-                  {c.isSaved === true ? "★ " : ""}
-                  {c.title}
-                </span>
-                {c.unreadCount > 0 ? (
-                  <span className="shrink-0 rounded-full bg-sky-600 px-1.5 text-xs text-white">
-                    {c.unreadCount}
+        <div
+          className={`flex min-h-0 flex-1 flex-col ${panelTransition} ${
+            panelOpen
+              ? "pointer-events-none invisible scale-[0.98] opacity-0"
+              : "visible scale-100 opacity-100"
+          }`}
+          aria-hidden={panelOpen}
+        >
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {loadingChats ? <p className="p-3 text-sm opacity-60">Загрузка чатов…</p> : null}
+            {visibleChats.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onSelectChat(c.id)}
+                className={`flex w-full flex-col gap-0.5 border-b px-3 py-2.5 text-left text-sm ${
+                  isLight ? "border-zinc-100" : "border-zinc-800/80"
+                } ${
+                  activeChatId === c.id
+                    ? isLight
+                      ? "bg-sky-50"
+                      : "bg-sky-950/40"
+                    : isLight
+                      ? "hover:bg-zinc-50"
+                      : "hover:bg-zinc-800/50"
+                }`}
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="truncate font-medium">
+                    {c.kind === "channel" ? "📢 " : ""}
+                    {c.title}
                   </span>
-                ) : null}
-              </span>
-              {c.lastMessage ? (
-                <span className="truncate text-xs opacity-60">{c.lastMessage.text || "…"}</span>
+                  {c.unreadCount > 0 ? (
+                    <span className="shrink-0 rounded-full bg-sky-600 px-1.5 text-xs text-white">
+                      {c.unreadCount}
+                    </span>
+                  ) : null}
+                </span>
+                {c.lastMessage ? (
+                  <span className="truncate text-xs opacity-60">{c.lastMessage.text || "…"}</span>
+                ) : (
+                  <span className="text-xs opacity-40">Нет сообщений</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {avatarZoomOpen && hasAvatar
+        ? createPortal(
+            <MessengerModalBackdrop
+              zIndexClass="z-[400]"
+              paddingClass="p-6"
+              onBackdropClick={() => setAvatarZoomOpen(false)}
+            >
+              <img
+                src={profilePrefs.avatarDataUrl!}
+                alt=""
+                role="dialog"
+                aria-modal="true"
+                aria-label="Фото профиля"
+                className={`max-h-[min(80vh,520px)] max-w-full cursor-zoom-out object-contain ${
+                  isRounded ? "rounded-2xl" : "rounded-none"
+                }`}
+                onClick={() => setAvatarZoomOpen(false)}
+              />
+            </MessengerModalBackdrop>,
+            getMessengerModalPortalRoot(),
+          )
+        : null}
+    </aside>
+  );
+}
+
+function RailIconButton({
+  title,
+  active,
+  className,
+  activeClass,
+  onClick,
+  children,
+}: {
+  title: string;
+  active: boolean;
+  className: string;
+  activeClass: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      aria-pressed={active}
+      className={`${className} ${active ? activeClass : ""}`}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+const MESSENGER_PROFILE_SETTINGS: { id: MessengerSettingsButtonId; label: string }[] = [
+  { id: "privacy", label: "Конфиденциальность" },
+  { id: "notifications", label: "Уведомления и звуки" },
+  { id: "data", label: "Данные и память" },
+  { id: "language", label: "Язык" },
+];
+
+function ProfileSettingsLinks({
+  isLight,
+  appearance,
+  onOpenSection,
+}: {
+  isLight: boolean;
+  appearance: MessengerProfileAppearance;
+  onOpenSection: (id: MessengerSettingsButtonId) => void;
+}) {
+  return (
+    <nav
+      className="mx-3 overflow-hidden rounded-xl bg-black/20 ring-1 ring-white/10 backdrop-blur-sm"
+      aria-label="Настройки профиля"
+    >
+      {MESSENGER_PROFILE_SETTINGS.map((item, i) => {
+        const rowStyle = settingsButtonRowStyle(appearance, item.id);
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onOpenSection(item.id)}
+            className={`flex w-full items-center justify-between gap-2 px-3.5 py-2.5 text-left text-[13px] font-medium transition-colors hover:bg-white/10 ${
+              i > 0 ? "border-t border-white/10" : ""
+            } ${isLight ? "text-zinc-100" : "text-white/90"}`}
+            style={rowStyle}
+          >
+            <span>{item.label}</span>
+            <span className="text-white/40" aria-hidden>
+              ›
+            </span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function ProfileInfoCard({
+  heroStyle,
+  children,
+  editButton,
+}: {
+  heroStyle: CSSProperties | undefined;
+  children: React.ReactNode;
+  editButton?: React.ReactNode;
+}) {
+  return (
+    <div className="relative mx-3 shrink-0 overflow-hidden rounded-xl ring-1 ring-white/10" style={heroStyle}>
+      <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-b from-black/10 via-black/25 to-black/35" />
+      {editButton ? <div className="absolute right-2 top-2 z-10">{editButton}</div> : null}
+      <div className={`relative z-[1] px-4 py-3.5 ${editButton ? "pr-10" : ""}`}>{children}</div>
+    </div>
+  );
+}
+
+function ProfileInfoDivider() {
+  const lineClass =
+    "h-px flex-1 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.18)_42%,rgba(255,255,255,0.28)_50%,rgba(255,255,255,0.18)_58%,transparent)] shadow-[0_1px_0_rgba(0,0,0,0.14)]";
+  return (
+    <div className="-mx-4 my-3 flex items-center gap-2.5 px-4" role="separator" aria-hidden>
+      <span className={lineClass} />
+      <span className="size-1 shrink-0 rounded-full bg-white/20 ring-1 ring-white/10 shadow-[0_0_0_1px_rgba(0,0,0,0.2)]" />
+      <span className={lineClass} />
+    </div>
+  );
+}
+
+function ProfilePanel({
+  isLight,
+  draft,
+  setDraft,
+  me,
+  displayName,
+  hasAvatar,
+  avatarZoomOpen,
+  onToggleZoom,
+  onPickAvatar,
+  avatarInputRef,
+  onAvatarFile,
+  inputClass,
+  boundsRef,
+  appearance,
+  onOpenAppearance,
+  saving,
+  onSave,
+}: {
+  isLight: boolean;
+  me: AuthUserDto;
+  displayName: string;
+  draft: UserProfilePrefs;
+  setDraft: React.Dispatch<React.SetStateAction<UserProfilePrefs | null>>;
+  hasAvatar: boolean;
+  avatarZoomOpen: boolean;
+  onToggleZoom: () => void;
+  onPickAvatar: () => void;
+  avatarInputRef: React.RefObject<HTMLInputElement | null>;
+  onAvatarFile: (file: File | undefined) => void;
+  inputClass: string;
+  boundsRef: React.RefObject<HTMLDivElement | null>;
+  appearance: MessengerProfileAppearance;
+  onOpenAppearance: () => void;
+  saving: boolean;
+  onSave: (draft: UserProfilePrefs) => void;
+}) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<MessengerSettingsButtonId | null>(null);
+  const heroStyle = heroCardStyle(appearance);
+  const avatarRound = avatarShapeClass(appearance.avatarShape);
+  const avatarRadius = avatarShapeStyle(appearance.avatarShape);
+  const nameSizeClass = nameScaleClass(appearance.nameScale);
+  const shownName = draft.displayName.trim() || displayName;
+
+  const shownEmail = draft.profileEmail.trim() || me.email;
+
+  const labelColor = appearance.detailsLabelColor || undefined;
+  const valueColor = appearance.detailsValueColor || undefined;
+
+  const infoField = (label: string, value: string, opts?: { wide?: boolean }) => {
+    const text = value.trim();
+    const empty = !text;
+    return (
+      <div className={opts?.wide ? "col-span-2" : undefined}>
+        <dt
+          className={`text-[10px] font-semibold uppercase tracking-[0.12em] ${labelColor ? "" : "text-white/45"}`}
+          style={labelColor ? { color: labelColor } : undefined}
+        >
+          {label}
+        </dt>
+        <dd
+          className={`mt-0.5 break-words font-sans text-[13px] leading-snug ${
+            valueColor ? "" : empty ? "text-white/35" : "text-white/90"
+          } ${opts?.wide ? "whitespace-pre-wrap" : ""} ${empty ? "font-normal italic" : ""}`}
+          style={valueColor ? { color: valueColor, opacity: empty ? 0.55 : 1 } : undefined}
+          title={text || undefined}
+        >
+          {text || "Не указано"}
+        </dd>
+      </div>
+    );
+  };
+
+  return (
+    <div className="-mx-3 flex min-h-0 flex-1 flex-col gap-3">
+      <MessengerProfileDetailsModal
+        open={detailsOpen}
+        isLight={isLight}
+        applied={draft}
+        accountEmail={me.email}
+        inputClass={inputClass}
+        saving={saving}
+        onClose={() => setDetailsOpen(false)}
+        onSave={(next) => {
+          setDraft(next);
+          onSave(next);
+          setDetailsOpen(false);
+        }}
+      />
+      <MessengerProfileSettingsModal
+        open={settingsSection !== null}
+        section={settingsSection}
+        isLight={isLight}
+        onClose={() => setSettingsSection(null)}
+      />
+      <div
+        className="relative mx-3 shrink-0 overflow-visible rounded-xl py-3 pl-4 pr-10 ring-1 ring-white/10"
+        style={heroStyle}
+      >
+        <button
+          type="button"
+          className="absolute right-2 top-2 rounded-lg p-1.5 text-white/70 transition-opacity hover:bg-white/10 hover:text-white"
+          title="Оформление профиля"
+          aria-label="Оформление профиля в мессенджере"
+          onClick={onOpenAppearance}
+        >
+          <IconSettings className="size-4" />
+        </button>
+        <div className="flex items-start gap-3">
+          <div className="group relative size-20 shrink-0">
+            <button
+              type="button"
+              className={`relative block size-20 overflow-hidden ring-1 ring-black/10 ${avatarRound} ${
+                hasAvatar ? "cursor-zoom-in" : ""
+              } ${avatarZoomOpen ? "ring-2 ring-sky-500" : ""}`}
+              style={avatarRadius}
+              onClick={onToggleZoom}
+              disabled={!hasAvatar}
+            >
+              {hasAvatar && draft.avatarDataUrl ? (
+                <img
+                  src={draft.avatarDataUrl}
+                  alt=""
+                  className={`size-20 object-cover ${avatarRound}`}
+                  style={avatarRadius}
+                />
               ) : (
-                <span className="text-xs opacity-40">Нет сообщений</span>
+                <span
+                  className={`flex size-20 items-center justify-center text-xl font-semibold ${avatarRound} ${
+                    isLight ? "bg-zinc-200 text-zinc-700" : "bg-zinc-700 text-zinc-200"
+                  }`}
+                  style={avatarRadius}
+                >
+                  {userInitials(displayName, me.email)}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              className="absolute bottom-0 left-0 z-20 flex size-7 -translate-x-1 translate-y-2.5 items-center justify-center rounded-full bg-zinc-950/90 text-white opacity-0 shadow ring-2 ring-white/30 transition-[opacity,background-color] hover:bg-zinc-800 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+              title="Изменить фото"
+              aria-label="Изменить фото"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPickAvatar();
+              }}
+            >
+              <IconPencil className="size-4" />
+            </button>
+            <ProfileEmojiStatusMenu
+              isLight={isLight}
+              value={draft.emojiStatus}
+              boundsRef={boundsRef}
+              onChange={(emojiStatus) => setDraft({ ...draft, emojiStatus })}
+            >
+              {({ btnRef, open, toggle }) => (
+                <button
+                  ref={btnRef}
+                  type="button"
+                  title={draft.emojiStatus ? `Статус: ${draft.emojiStatus}. Изменить` : "Выбрать статус (эмодзи)"}
+                  aria-label={draft.emojiStatus ? `Статус: ${draft.emojiStatus}. Изменить` : "Выбрать статус (эмодзи)"}
+                  aria-expanded={open}
+                  className={`absolute bottom-0 right-0 z-20 flex size-7 translate-x-1 translate-y-2.5 items-center justify-center rounded-full bg-zinc-950/90 shadow ring-2 ring-white/30 transition-colors hover:bg-zinc-800 ${
+                    open ? "ring-sky-300/60" : ""
+                  } ${draft.emojiStatus ? "text-[16px] leading-none" : "text-white"}`}
+                  onClick={toggle}
+                >
+                  {draft.emojiStatus ? draft.emojiStatus : <IconSmile className="size-4" />}
+                </button>
+              )}
+            </ProfileEmojiStatusMenu>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                onAvatarFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </div>
+          <div className="min-w-0 flex-1 self-start text-left">
+            <div className="inline-flex max-w-full flex-col items-start">
+              <p className={`font-sans font-medium leading-snug text-white ${nameSizeClass}`}>{shownName}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto">
+        <ProfileInfoCard
+          heroStyle={heroStyle}
+          editButton={
+            <button
+              type="button"
+              className="rounded-lg bg-black/25 p-1.5 text-white/75 backdrop-blur-sm transition-colors hover:bg-black/40 hover:text-white"
+              title="Редактировать"
+              aria-label="Редактировать информацию о себе"
+              onClick={() => setDetailsOpen(true)}
+            >
+              <IconPencil className="size-4" />
+            </button>
+          }
+        >
+          <dl>{infoField("О себе", draft.signature, { wide: true })}</dl>
+        </ProfileInfoCard>
+
+        <ProfileInfoCard heroStyle={heroStyle}>
+          <dl>
+            <div>{infoField("Почта", shownEmail, { wide: true })}</div>
+            <ProfileInfoDivider />
+            <div>{infoField("Тел.", draft.contact, { wide: true })}</div>
+            <ProfileInfoDivider />
+            <div>{infoField("Город", draft.city, { wide: true })}</div>
+          </dl>
+        </ProfileInfoCard>
+
+        <ProfileInfoCard heroStyle={heroStyle}>
+          <dl>
+            <div>{infoField("Пол", genderDisplayLabel(draft.gender), { wide: true })}</div>
+            <ProfileInfoDivider />
+            <div>{infoField("День рождения", draft.birthDate, { wide: true })}</div>
+          </dl>
+        </ProfileInfoCard>
+      </div>
+
+      <ProfileSettingsLinks
+        isLight={isLight}
+        appearance={appearance}
+        onOpenSection={setSettingsSection}
+      />
+
+      <Link
+        to="/profile#identity"
+        className={`mx-3 pb-2 text-center text-xs font-medium opacity-80 transition-opacity hover:opacity-100 ${
+          isLight ? "text-sky-700" : "text-sky-400"
+        }`}
+      >
+        Полный профиль →
+      </Link>
+    </div>
+  );
+}
+
+type EmojiStatusTriggerProps = {
+  btnRef: React.RefObject<HTMLButtonElement | null>;
+  open: boolean;
+  toggle: (e: React.MouseEvent) => void;
+};
+
+function ProfileEmojiStatusMenu({
+  isLight,
+  value,
+  boundsRef,
+  onChange,
+  children,
+}: {
+  isLight: boolean;
+  value: string;
+  boundsRef: React.RefObject<HTMLDivElement | null>;
+  onChange: (emoji: string) => void;
+  children: (props: EmojiStatusTriggerProps) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [anchor, setAnchor] = useState({ top: 0, left: 0, width: 240 });
+
+  const updateAnchor = () => {
+    const btn = btnRef.current;
+    const panel = boundsRef.current;
+    if (!btn || !panel) return;
+    const br = panel.getBoundingClientRect();
+    const r = btn.getBoundingClientRect();
+    const pad = 8;
+    const width = Math.max(160, br.width - pad * 2);
+    let left = br.left + pad;
+    const top = r.bottom + 6;
+    setAnchor({ top, left, width });
+  };
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    updateAnchor();
+    const onLayout = () => updateAnchor();
+    window.addEventListener("resize", onLayout);
+    window.addEventListener("scroll", onLayout, true);
+    return () => {
+      window.removeEventListener("resize", onLayout);
+      window.removeEventListener("scroll", onLayout, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current?.contains(t) || popoverRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const chip = (active: boolean) =>
+    `flex size-9 shrink-0 items-center justify-center rounded-lg text-lg transition-colors ${
+      active
+        ? isLight
+          ? "bg-sky-100 ring-1 ring-sky-300"
+          : "bg-sky-950/60 ring-1 ring-sky-500/50"
+        : isLight
+          ? "hover:bg-zinc-200/80"
+          : "hover:bg-zinc-700/80"
+    }`;
+
+  const popover = (
+    <div
+      ref={popoverRef}
+      role="listbox"
+      aria-label="Выбор статуса"
+      className={`fixed z-[500] overflow-hidden rounded-xl border shadow-xl transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+        isLight ? "border-zinc-200 bg-white" : "border-zinc-600 bg-zinc-900"
+      } ${open ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0"}`}
+      style={{
+        top: anchor.top,
+        left: anchor.left,
+        width: anchor.width,
+        maxHeight: "min(50vh, 320px)",
+      }}
+    >
+      <div className="max-h-[min(45vh,280px)] overflow-y-auto overscroll-contain p-2">
+        <div className="grid grid-cols-6 gap-1">
+          {PROFILE_STATUS_EMOJI.map((emoji) => (
+            <button
+              key={emoji || "clear"}
+              type="button"
+              title={emoji ? `Статус ${emoji}` : "Без статуса"}
+              className={chip(value === emoji)}
+              onClick={() => {
+                if (emoji) pickMessengerEmoji(emoji);
+                onChange(emoji);
+                setOpen(false);
+              }}
+            >
+              {emoji ? (
+                emoji
+              ) : (
+                <span className="text-xs opacity-40" aria-hidden>
+                  —
+                </span>
               )}
             </button>
           ))}
         </div>
-        </div>
       </div>
+    </div>
+  );
 
-      {avatarZoomOpen && hasAvatar ? (
-        <div
-          className="fixed inset-0 z-[400] flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Фото профиля"
-          onClick={() => setAvatarZoomOpen(false)}
-        >
-          <img
-            src={profilePrefs.avatarDataUrl!}
-            alt=""
-            className={`max-h-[min(80vh,520px)] max-w-full cursor-zoom-out object-contain ${
-              isRounded ? "rounded-2xl" : "rounded-none"
-            }`}
-            onClick={() => setAvatarZoomOpen(false)}
-          />
-        </div>
-      ) : null}
-    </aside>
+  const toggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpen((o) => {
+      if (!o) queueMicrotask(updateAnchor);
+      return !o;
+    });
+  };
+
+  return (
+    <>
+      {children({ btnRef, open, toggle })}
+      {typeof document !== "undefined" ? createPortal(popover, document.body) : null}
+    </>
+  );
+}
+
+function ContactsPanel({
+  directChats,
+  activeChatId,
+  userSearch,
+  setUserSearch,
+  inputClass,
+  isLight,
+  onSelectChat,
+  onPickUser,
+}: {
+  directChats: ChatListItemDto[];
+  activeChatId: string | null;
+  userSearch: string;
+  setUserSearch: (v: string) => void;
+  inputClass: string;
+  isLight: boolean;
+  onSelectChat: (id: string) => void;
+  onPickUser: (userId: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <input
+        type="search"
+        placeholder="Найти по email или имени…"
+        value={userSearch}
+        onChange={(e) => setUserSearch(e.target.value)}
+        className={inputClass}
+      />
+      <UserSearchHits query={userSearch} onPick={onPickUser} />
+      {directChats.length > 0 ? (
+        <>
+          <p className="text-[10px] font-medium uppercase opacity-50">Диалоги</p>
+          <ul className="max-h-40 overflow-y-auto text-sm">
+            {directChats.map((c) => (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  className={`w-full rounded-lg px-2 py-1.5 text-left ${
+                    activeChatId === c.id
+                      ? isLight
+                        ? "bg-sky-50 text-sky-800"
+                        : "bg-sky-950/40 text-sky-200"
+                      : "hover:bg-black/5 dark:hover:bg-white/5"
+                  }`}
+                  onClick={() => onSelectChat(c.id)}
+                >
+                  {c.title}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="text-xs opacity-50">Пока нет личных диалогов — найдите человека выше.</p>
+      )}
+    </div>
   );
 }
 
@@ -435,12 +1167,12 @@ function UserSearchHits({
   if (hits.length === 0) return null;
 
   return (
-    <ul className="mt-2 max-h-32 overflow-y-auto text-sm">
+    <ul className="max-h-28 overflow-y-auto rounded-lg border border-zinc-500/20 text-sm">
       {hits.map((u) => (
         <li key={u.id}>
           <button
             type="button"
-            className="w-full px-1 py-1 text-left hover:underline"
+            className="w-full px-2 py-1.5 text-left hover:bg-sky-500/10"
             onClick={() => onPick(u.id)}
           >
             {u.displayName || u.email}

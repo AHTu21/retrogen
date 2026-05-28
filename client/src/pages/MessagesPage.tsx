@@ -35,6 +35,7 @@ import {
   mergePendingAttachments,
 } from "../lib/messengerAttachments";
 import { RetrogenOverflowMenu } from "../components/RetrogenOverflowMenu";
+import { MessengerNavIconButton } from "../components/MessengerNavIconButton";
 import { ThemeCornersIconButtons } from "../components/ThemeCornersIconButtons";
 import { expandEmojiShortcodesInPlain } from "../lib/stickerEditorExtras";
 import { insertAtTextareaCursor } from "../lib/insertAtTextareaCursor";
@@ -450,7 +451,7 @@ export function MessagesPage() {
   }`;
 
   return (
-    <div className={shell}>
+    <div id="retrogen-messages-shell" className={shell}>
       <div className="mx-auto flex h-screen max-w-6xl flex-col px-3 py-3 md:px-4">
         <header
           className={`mb-3 flex flex-wrap items-center justify-between gap-2 border-b pb-3 ${
@@ -470,6 +471,7 @@ export function MessagesPage() {
               toggleTheme={toggleTheme}
               toggleCorners={toggleCorners}
             />
+            <MessengerNavIconButton isLight={isLight} />
             <RetrogenOverflowMenu
               isLight={isLight}
               onAbout={() => undefined}

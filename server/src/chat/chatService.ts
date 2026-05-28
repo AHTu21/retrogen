@@ -234,6 +234,26 @@ export async function getOrCreateDirectChat(creatorId: string, otherUserId: stri
   });
 }
 
+export async function createChannelChat(
+  creatorId: string,
+  title: string,
+  description?: string,
+) {
+  const t = title.trim().slice(0, 120);
+  if (!t) throw new Error("bad_title");
+  const desc = (description ?? "").trim().slice(0, 500);
+  return prisma.chat.create({
+    data: {
+      kind: "channel",
+      title: t,
+      description: desc,
+      createdById: creatorId,
+      members: { create: { userId: creatorId, role: "owner" } },
+    },
+    include: chatListInclude,
+  });
+}
+
 export async function createGroupChat(
   creatorId: string,
   title: string,

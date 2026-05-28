@@ -92,6 +92,7 @@ import { useAppCorners, useAppTheme } from "../theme";
 import { RoomPasswordGate } from "../components/RoomPasswordGate";
 import { RetrogenDockableAbout } from "../components/RetrogenDockableAbout";
 import { RetrogenOverflowMenu } from "../components/RetrogenOverflowMenu";
+import { MessengerNavIconButton } from "../components/MessengerNavIconButton";
 import { ThemeCornersIconButtons } from "../components/ThemeCornersIconButtons";
 
 const GUEST_NAME_KEY = "retrogen_guest_name";
@@ -4452,6 +4453,7 @@ export function RoomPage() {
               toggleTheme={toggleTheme}
               toggleCorners={toggleCorners}
             />
+            <MessengerNavIconButton isLight={isLight} />
             <button
               type="button"
               className={`rounded p-2 text-sm ${isLight ? "bg-zinc-900 text-white" : "bg-zinc-200 text-zinc-900"}`}

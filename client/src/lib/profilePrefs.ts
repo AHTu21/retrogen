@@ -12,6 +12,8 @@ export type CursorStyle = "default" | "crosshair" | "pointer" | "grab";
 
 export type UserProfilePrefs = {
   displayName: string;
+  /** Почта в карточке мессенджера; пусто — показывается email аккаунта */
+  profileEmail: string;
   contact: string;
   gender: string;
   city: string;
@@ -31,10 +33,13 @@ export type UserProfilePrefs = {
   avatarDataUrl: string | null;
   /** Обои поверх фона комнаты /r/… */
   wallpaperDataUrl: string | null;
+  /** Эмодзи-статус в мессенджере и профиле */
+  emojiStatus: string;
 };
 
 const defaultPrefs: UserProfilePrefs = {
   displayName: "",
+  profileEmail: "",
   contact: "",
   gender: "",
   city: "",
@@ -48,6 +53,7 @@ const defaultPrefs: UserProfilePrefs = {
   profileAccent: DEFAULT_PROFILE_ACCENT,
   avatarDataUrl: null,
   wallpaperDataUrl: null,
+  emojiStatus: "",
 };
 
 const DATA_IMAGE_RE = /^data:image\//i;
@@ -104,6 +110,7 @@ export function loadProfilePrefs(): UserProfilePrefs {
     const p = JSON.parse(raw) as Partial<UserProfilePrefs>;
     const loaded: UserProfilePrefs = {
       displayName: typeof p.displayName === "string" ? p.displayName : "",
+      profileEmail: typeof p.profileEmail === "string" ? p.profileEmail.trim().slice(0, 120) : "",
       contact: typeof p.contact === "string" ? p.contact : "",
       gender: typeof p.gender === "string" ? p.gender : "",
       city: typeof p.city === "string" ? p.city : "",
@@ -124,6 +131,7 @@ export function loadProfilePrefs(): UserProfilePrefs {
       })(),
       avatarDataUrl: typeof p.avatarDataUrl === "string" ? p.avatarDataUrl : null,
       wallpaperDataUrl: typeof p.wallpaperDataUrl === "string" ? p.wallpaperDataUrl : null,
+      emojiStatus: typeof p.emojiStatus === "string" ? p.emojiStatus.trim().slice(0, 8) : "",
     };
     const sanitized = sanitizeProfilePrefs(loaded);
     if (JSON.stringify(sanitized) !== JSON.stringify(loaded)) {

@@ -508,6 +508,22 @@ export async function createDirectChat(userId: string): Promise<{ chat: ChatList
   return res.json() as Promise<{ chat: ChatListItemDto }>;
 }
 
+export async function createChannelChat(
+  title: string,
+  description?: string,
+): Promise<{ chat: ChatListItemDto }> {
+  const res = await apiFetch("/api/chats/channel", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, description: description ?? "" }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? res.statusText);
+  }
+  return res.json() as Promise<{ chat: ChatListItemDto }>;
+}
+
 export async function createGroupChat(title: string, memberIds: string[]): Promise<{ chat: ChatListItemDto }> {
   const res = await apiFetch("/api/chats/group", {
     method: "POST",
