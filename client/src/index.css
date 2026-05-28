@@ -162,3 +162,9 @@ html:is(.corners-rounded, .corners-sharp) :where(
   user-select: none;
   pointer-events: none;
 }
+
+/* Профиль: тени/ring не должны расширять горизонтальную прокрутку документа */
+html.profile-no-scroll-x {
+  overflow-x: clip;
+  max-width: 100%;
+}

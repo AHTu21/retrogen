@@ -76,18 +76,18 @@ export function createProfileDesign(isLight: boolean, isRounded: boolean): Profi
     topBar:
       "border-b border-[var(--ph-border)] bg-[var(--ph-sticky-bg)] backdrop-blur-xl backdrop-saturate-150 supports-[backdrop-filter]:bg-[var(--ph-sticky-bg)]",
 
-    window: `flex flex-col ${rMd} bg-[var(--ph-panel-bg)] [box-shadow:var(--ph-shadow)] ring-1 ring-[var(--ph-border)] lg:flex-row lg:items-start`,
+    window: `flex min-w-0 max-w-full flex-col overflow-x-clip ${rMd} border border-[var(--ph-border)] bg-[var(--ph-panel-bg)] lg:flex-row lg:items-start`,
 
     sidebar:
-      "flex w-full shrink-0 flex-col bg-[var(--ph-sidebar-bg)] lg:sticky lg:top-24 lg:w-[15.5rem] lg:self-start lg:border-r lg:border-[var(--ph-separator)] xl:w-[16.25rem]",
+      "flex w-full min-w-0 shrink-0 flex-col overflow-x-clip bg-[var(--ph-sidebar-bg)] lg:sticky lg:top-24 lg:w-[15.5rem] lg:max-w-[16.25rem] lg:self-start lg:border-r lg:border-[var(--ph-separator)] xl:w-[16.25rem]",
 
     sidebarWidth: "",
 
     sidebarScroll: "flex flex-col",
 
-    detail: "flex min-w-0 flex-1 flex-col bg-[var(--ph-panel-bg)]",
+    detail: "flex min-w-0 flex-1 flex-col overflow-x-clip bg-[var(--ph-panel-bg)]",
 
-    detailInner: "mx-auto w-full max-w-[42rem] min-w-0 px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7",
+    detailInner: "mx-auto w-full min-w-0 max-w-[42rem] overflow-x-clip px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7",
 
     groupTitle: "text-[0.8125rem] font-semibold tracking-[-0.01em] text-[var(--ph-text)]",
 

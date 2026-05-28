@@ -37,7 +37,7 @@ type ColorGroupProps = {
 export function SettingColorGroup({ d, title, hint, value, presets, normalize, onChange }: ColorGroupProps) {
   const norm = normalize(value);
   return (
-    <div className={`min-w-0 max-w-full ${d.rSm} bg-[var(--ph-setting-tray)] p-3.5 sm:p-4`}>
+    <div className={`min-w-0 max-w-full overflow-hidden ${d.rSm} bg-[var(--ph-setting-tray)] p-3.5 sm:p-4`}>
       <div className="mb-3 flex min-w-0 items-baseline justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[0.8125rem] font-medium text-[var(--ph-text)]">{title}</p>
@@ -45,7 +45,7 @@ export function SettingColorGroup({ d, title, hint, value, presets, normalize, o
         </div>
         <span className={`shrink-0 font-mono text-[0.6875rem] tabular-nums ${d.muted}`}>{norm}</span>
       </div>
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2 overflow-hidden p-0.5">
         {presets.map((preset) => {
           const active = norm === preset.hex;
           return (
@@ -56,8 +56,8 @@ export function SettingColorGroup({ d, title, hint, value, presets, normalize, o
               onClick={() => onChange(preset.hex)}
               className={`h-8 w-8 shrink-0 rounded-full transition ${
                 active
-                  ? "ring-2 ring-[var(--ph-accent)] ring-offset-2 ring-offset-[var(--ph-setting-tray)]"
-                  : "ring-1 ring-black/10 hover:scale-105 dark:ring-white/12"
+                  ? "ring-2 ring-[var(--ph-accent)]"
+                  : "ring-1 ring-black/10 hover:opacity-90 dark:ring-white/12"
               }`}
               style={{ backgroundColor: preset.hex }}
               aria-label={preset.label}
@@ -110,9 +110,9 @@ export function RoomLivePreview({
           <span
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide ${d.badgeLive} ${d.rFull}`}
           >
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span className="relative inline-flex h-3 w-3 shrink-0 overflow-hidden rounded-full">
+              <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400 opacity-60" />
+              <span className="relative m-auto h-1.5 w-1.5 rounded-full bg-emerald-500" />
             </span>
             Live
           </span>
@@ -195,10 +195,10 @@ export function RoomQuickThemes({
               key={preset.id}
               type="button"
               onClick={() => onApply(preset)}
-              className={`flex w-full min-w-0 flex-col overflow-hidden text-left transition ${d.rSm} ${
+              className={`flex w-full min-w-0 flex-col overflow-hidden border text-left transition ${d.rSm} ${
                 active
-                  ? "bg-[var(--ph-nav-active-bg)] ring-2 ring-[var(--ph-accent)]"
-                  : "bg-[var(--ph-surface-elevated)] ring-1 ring-[var(--ph-border)] hover:bg-[var(--ph-nav-hover)] hover:ring-[var(--ph-accent)]/35"
+                  ? "border-2 border-[var(--ph-accent)] bg-[var(--ph-nav-active-bg)]"
+                  : "border border-[var(--ph-border)] bg-[var(--ph-surface-elevated)] hover:bg-[var(--ph-nav-hover)]"
               }`}
               aria-pressed={active}
             >

@@ -67,6 +67,11 @@ export function ProfilePage() {
   }, []);
 
   useEffect(() => {
+    document.documentElement.classList.add("profile-no-scroll-x");
+    return () => document.documentElement.classList.remove("profile-no-scroll-x");
+  }, []);
+
+  useEffect(() => {
     if (!authUser && (section === "organization" || section === "billing" || section === "danger")) {
       setSection("overview");
       window.location.hash = "overview";
@@ -159,10 +164,10 @@ export function ProfilePage() {
       onHelpOpenCloseAbout={() => setAboutOpen(false)}
       body={profileHelpBody}
     >
-      <div className={`profile-app min-h-dvh ${d.page}`} style={accentStyle}>
-        <div className="mx-auto flex w-full max-w-[72rem] flex-col px-3 py-3 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
+      <div className={`profile-app min-h-dvh overflow-x-clip ${d.page}`} style={accentStyle}>
+        <div className="mx-auto flex w-full min-w-0 max-w-[72rem] flex-col overflow-x-clip px-3 py-3 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
           <header
-            className={`sticky top-0 z-30 -mx-3 mb-4 flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:-mx-5 sm:px-5 lg:-mx-6 lg:mb-5 lg:px-6 ${d.topBar}`}
+            className={`sticky top-0 z-30 mb-4 flex flex-wrap items-center justify-between gap-3 py-3 ${d.topBar}`}
           >
             <Link to="/home" className="group min-w-0 transition hover:opacity-80">
               <p className={d.eyebrow}>Retrogen</p>

@@ -30,7 +30,7 @@ export function ProfileSectionFrame({
   const meta = PROFILE_NAV.find((n) => n.id === sectionId);
   if (!meta) return null;
   return (
-    <div className={compact ? "flex min-h-0 w-full flex-1 flex-col" : "min-w-0 w-full"}>
+    <div className={compact ? "flex min-h-0 w-full flex-1 flex-col" : "min-w-0 w-full max-w-full overflow-x-clip"}>
       <header className={compact ? "mb-4 shrink-0 border-b border-[var(--ph-separator)] pb-4" : "mb-6 border-b border-[var(--ph-separator)] pb-5"}>
         <h1 className={d.pageTitle}>{meta.label}</h1>
         {meta.hint && !compact ? <p className={d.pageLead}>{meta.hint}</p> : null}
@@ -303,9 +303,7 @@ export function CompactColorRow({
               title={preset.label}
               onClick={() => onChange(preset.hex)}
               className={`h-7 w-7 shrink-0 rounded-full ring-1 ring-black/10 transition dark:ring-white/15 sm:h-8 sm:w-8 ${
-                active
-                  ? "ring-2 ring-[var(--ph-accent)] ring-offset-1 ring-offset-[var(--ph-surface)]"
-                  : "hover:scale-110"
+                active ? "ring-2 ring-inset ring-[var(--ph-accent)]" : "hover:scale-110"
               }`}
               style={{ backgroundColor: preset.hex }}
               aria-label={preset.label}
@@ -395,7 +393,7 @@ export function ProfileColorPicker({
               title={preset.label}
               onClick={() => onChange(preset.hex)}
               className={`flex min-w-0 flex-col items-center gap-1.5 rounded-xl p-2 transition ${
-                active ? "ring-2 ring-[var(--ph-accent)] ring-offset-2 ring-offset-[var(--ph-surface)]" : "hover:bg-[var(--ph-nav-hover)]"
+                active ? "ring-2 ring-inset ring-[var(--ph-accent)]" : "hover:bg-[var(--ph-nav-hover)]"
               }`}
             >
               <span
@@ -502,12 +500,12 @@ function PeerCursor({
   isLightBoard: boolean;
 }) {
   return (
-    <div className={`pointer-events-none absolute z-20 ${className}`} aria-hidden>
-      <svg width="14" height="18" viewBox="0 0 14 18" className="drop-shadow-sm">
+    <div className={`pointer-events-none absolute z-20 flex max-w-[4.5rem] flex-col items-start ${className}`} aria-hidden>
+      <svg width="14" height="18" viewBox="0 0 14 18" className="shrink-0 drop-shadow-sm">
         <path d="M1 1 L1 14 L5 10 L8 16 L10 15 L7 9 L12 9 Z" fill={color} stroke={isLightBoard ? "#fff" : "#18181b"} strokeWidth="0.75" />
       </svg>
       <span
-        className="ml-2 mt-0.5 inline-block rounded px-1 py-px text-[0.5625rem] font-semibold text-white"
+        className="mt-0.5 max-w-full truncate rounded px-1 py-px text-[0.5625rem] font-semibold text-white"
         style={{ backgroundColor: color }}
       >
         {label}
@@ -563,11 +561,14 @@ export function BoardPreviewPanel({
     : "radial-gradient(circle, rgb(255 255 255 / 0.07) 1px, transparent 1px)";
 
   return (
-    <div className={`w-full ${fill ? "flex min-h-0 flex-1 flex-col" : ""}`} aria-label="Превью доски ретро">
+    <div
+      className={`min-w-0 max-w-full overflow-hidden ${fill ? "flex min-h-0 w-full flex-1 flex-col" : "w-full"}`}
+      aria-label="Превью доски ретро"
+    >
       <div
         className={
           studio
-            ? `overflow-hidden ${d.rSm} bg-[var(--ph-surface-elevated)] p-2 ring-1 ring-[var(--ph-border)]`
+            ? `min-w-0 max-w-full overflow-hidden ${d.rSm} bg-[var(--ph-surface-elevated)] p-2 ring-1 ring-inset ring-[var(--ph-border)]`
             : ""
         }
       >
@@ -586,7 +587,7 @@ export function BoardPreviewPanel({
           </div>
         ) : null}
         <div
-          className={`${previewClass} ${studio ? `${d.rSm} ring-1 ring-black/10 dark:ring-white/10` : ""}`}
+          className={`${previewClass} max-w-full ${studio ? `${d.rSm} ring-1 ring-black/10 dark:ring-white/10` : ""}`}
           style={{
             background: previewBg,
             cursor: cursorCss(cursorStyle),
@@ -663,9 +664,9 @@ export function BoardPreviewPanel({
             ))}
           </div>
           <div
-            className={`absolute bottom-3 right-3 z-10 max-w-[7rem] rounded-lg px-2 py-1.5 text-[0.6875rem] font-medium leading-snug shadow-md ${
+            className={`absolute bottom-3 right-3 z-10 max-w-[min(7rem,40%)] rounded-lg px-2 py-1.5 text-[0.6875rem] font-medium leading-snug shadow-md ${
               isLightBoard ? "bg-amber-200/95 text-amber-950" : "bg-amber-400/95 text-amber-950"
-            } ${studio ? "rotate-[-1.5deg]" : ""}`}
+            }`}
           >
             {studio ? "Идея для Q2" : "Стикер"}
           </div>
