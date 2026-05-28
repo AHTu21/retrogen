@@ -78,7 +78,7 @@ function SidebarNav({
   if (compact) {
     return (
       <nav className="border-b border-[var(--ph-separator)] px-3 py-2 lg:hidden" aria-label="Разделы">
-        <div className="-mx-1 flex gap-1 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]">
+        <div className="flex gap-1 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]">
           {navItems.map((item) => (
             <NavItem
               key={item.id}

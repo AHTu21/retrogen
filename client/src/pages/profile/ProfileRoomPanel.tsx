@@ -40,7 +40,7 @@ export function ProfileRoomPanel({ d, prefs, setPrefs, onWallpaperFile, onWallpa
   };
 
   return (
-    <div className="flex min-w-0 flex-col gap-8">
+    <div className="flex min-w-0 max-w-full flex-col gap-8 overflow-x-clip">
       <RoomLivePreview d={d} prefs={prefs} />
 
       <RoomQuickThemes
