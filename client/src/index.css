@@ -163,6 +163,84 @@ html:is(.corners-rounded, .corners-sharp) :where(
   pointer-events: none;
 }
 
+@keyframes messenger-modal-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes messenger-modal-panel-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.messenger-modal-backdrop-enter {
+  animation: messenger-modal-fade-in 0.24s ease-out both;
+}
+
+.messenger-modal-panel-enter {
+  animation: messenger-modal-panel-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .messenger-modal-backdrop-enter,
+  .messenger-modal-panel-enter {
+    animation: none;
+  }
+}
+
+.messenger-modal-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.messenger-modal-scroll:hover {
+  scrollbar-color: rgb(255 255 255 / 0.18) transparent;
+}
+
+html.theme-light .messenger-modal-scroll:hover {
+  scrollbar-color: rgb(24 24 27 / 0.2) transparent;
+}
+
+.messenger-modal-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.messenger-modal-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.messenger-modal-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+.messenger-modal-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.16);
+}
+
+.messenger-modal-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(255 255 255 / 0.28);
+}
+
+html.theme-light .messenger-modal-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgb(24 24 27 / 0.14);
+}
+
+html.theme-light .messenger-modal-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(24 24 27 / 0.26);
+}
+
 /* Профиль: тени/ring не должны расширять горизонтальную прокрутку документа */
 html.profile-no-scroll-x {
   overflow-x: clip;

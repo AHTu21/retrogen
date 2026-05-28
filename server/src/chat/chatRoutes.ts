@@ -6,6 +6,7 @@ import { chatToListItem } from "./chatDto.js";
 import { guessMimeType } from "./attachmentPolicy.js";
 import { readChatAttachmentFile } from "./attachmentStorage.js";
 import {
+  createChannelChat,
   createGroupChat,
   getAttachmentForDownload,
   getChatDetail,
@@ -121,6 +122,20 @@ export function registerChatRoutes(app: FastifyInstance, io: Server) {
         ? req.body.memberIds.filter((x): x is string => typeof x === "string")
         : [];
       const chat = await createGroupChat(user.id, req.body?.title ?? "", memberIds);
+      return reply.code(201).send({ chat: chatToListItem(chat, user.id, 0) });
+    } catch (e) {
+      return mapChatError(e, reply);
+    }
+  });
+
+  app.post<{ Body: { title?: string; description?: string } }>("/api/chats/channel", async (req, reply) => {
+    try {
+      const user = await requireAuthUser(await getBearerUser(req));
+      const chat = await createChannelChat(
+        user.id,
+        req.body?.title ?? "",
+        req.body?.description ?? "",
+      );
       return reply.code(201).send({ chat: chatToListItem(chat, user.id, 0) });
     } catch (e) {
       return mapChatError(e, reply);

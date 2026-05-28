@@ -258,7 +258,7 @@ export function GroupChatSettingsPanel({
           {avatarZoomOpen && hasAvatar ? (
             <button
               type="button"
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/15 p-6 backdrop-blur-md dark:bg-black/20"
               onClick={() => setAvatarZoomOpen(false)}
               aria-label="Закрыть увеличенное фото"
             >

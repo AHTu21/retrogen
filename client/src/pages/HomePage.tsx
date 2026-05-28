@@ -13,6 +13,7 @@ import {
 import { RetrogenDockableAbout } from "../components/RetrogenDockableAbout";
 import { RetrogenDockableHelpRoot, RetrogenDockableHelpToggle } from "../components/RetrogenDockableHelp";
 import { RetrogenOverflowMenu } from "../components/RetrogenOverflowMenu";
+import { MessengerNavIconButton } from "../components/MessengerNavIconButton";
 import { ThemeCornersIconButtons } from "../components/ThemeCornersIconButtons";
 import { useAppCorners, useAppTheme } from "../theme";
 
@@ -1031,6 +1032,7 @@ export function HomePage() {
               toggleTheme={toggleTheme}
               toggleCorners={toggleCorners}
             />
+            <MessengerNavIconButton isLight={isLight} />
             <RetrogenDockableHelpToggle isLight={isLight} />
             <RetrogenOverflowMenu
               isLight={isLight}

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { RetrogenDockableAbout } from "../components/RetrogenDockableAbout";
 import { RetrogenDockableHelpRoot, RetrogenDockableHelpToggle } from "../components/RetrogenDockableHelp";
 import { RetrogenOverflowMenu } from "../components/RetrogenOverflowMenu";
+import { MessengerNavIconButton } from "../components/MessengerNavIconButton";
 import { ThemeCornersIconButtons } from "../components/ThemeCornersIconButtons";
 import { fetchAuthMe, logoutAccount, type AuthUserDto } from "../api";
 import { profileAccentCssVars } from "../lib/profileAccent";
@@ -205,6 +206,7 @@ export function ProfilePage() {
                 toggleTheme={toggleTheme}
                 toggleCorners={toggleCorners}
               />
+              <MessengerNavIconButton isLight={isLight} />
               <RetrogenDockableHelpToggle isLight={isLight} />
               <RetrogenOverflowMenu
                 isLight={isLight}
