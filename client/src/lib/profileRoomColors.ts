@@ -68,6 +68,19 @@ function hexRelativeLuminance(hex: string): number {
   return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
 }
 
+/** Подсказка, если фон и шапка слишком близки по яркости (WCAG-упрощённо). */
+export function roomPaletteContrastHint(boardBackdrop: string, headerTint: string): string | null {
+  const bg = normalizeBoardBackdropColor(boardBackdrop);
+  const header = normalizeHeaderTintColor(headerTint);
+  const bgL = hexRelativeLuminance(bg);
+  const headerL = hexRelativeLuminance(header);
+  const ratio = (Math.max(bgL, headerL) + 0.05) / (Math.min(bgL, headerL) + 0.05);
+  if (ratio < 1.35) {
+    return "Фон и шапка почти сливаются — выберите более контрастную пару.";
+  }
+  return null;
+}
+
 /** Цвета превью доски — от настроек комнаты, не от темы приложения. */
 export function resolveBoardPreviewColors(
   boardBackdrop: string,

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { InputHTMLAttributes, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { normalizeProfileAccent, PROFILE_ACCENT_PRESETS, type ProfileAccentPreset } from "../../lib/profileAccent";
 import type { CursorStyle } from "../../lib/profilePrefs";
@@ -14,12 +14,11 @@ const CURSOR_OPTIONS: { id: CursorStyle; label: string }[] = [
   { id: "crosshair", label: "Прицел" },
 ];
 
-/** Единый каркас любой секции профиля. */
+/** Каркас секции: заголовок detail-pane + контент (max ~42rem). */
 export function ProfileSectionFrame({
   d,
   sectionId,
   children,
-  aside,
   compact,
 }: {
   d: ProfileDesign;
@@ -31,21 +30,15 @@ export function ProfileSectionFrame({
   const meta = PROFILE_NAV.find((n) => n.id === sectionId);
   if (!meta) return null;
   return (
-    <div className={compact ? "flex min-h-0 w-full flex-1 flex-col" : "min-w-0 w-full"}>
-      <header className={compact ? "mb-4 shrink-0" : "mb-4 sm:mb-5"}>
-        <p className={d.eyebrow}>Настройки</p>
-        <h1 className={`mt-0.5 ${d.sectionTitle}`}>{meta.label}</h1>
-        {meta.hint && !compact ? <p className={d.sectionHint}>{meta.hint}</p> : null}
+    <div className={compact ? "flex min-h-0 w-full flex-1 flex-col" : "min-w-0 w-full max-w-full overflow-x-clip"}>
+      <header className={compact ? "mb-4 shrink-0 border-b border-[var(--ph-separator)] pb-4" : "mb-6 border-b border-[var(--ph-separator)] pb-5"}>
+        <h1 className={d.pageTitle}>{meta.label}</h1>
+        {meta.hint && !compact ? <p className={d.pageLead}>{meta.hint}</p> : null}
       </header>
-      {aside ? (
-        <div className="grid items-start gap-4 md:gap-5 lg:grid-cols-[minmax(0,1fr)_min(100%,17rem)] lg:gap-6 xl:grid-cols-[minmax(0,1fr)_15.5rem]">
-          <div className="min-w-0 space-y-4 md:space-y-5">{children}</div>
-          <div className="min-w-0 lg:sticky lg:top-24">{aside}</div>
-        </div>
-      ) : compact ? (
+      {compact ? (
         <div className="flex min-h-0 w-full flex-1 flex-col">{children}</div>
       ) : (
-        <div className="space-y-4 md:space-y-5">{children}</div>
+        <div className="space-y-6">{children}</div>
       )}
     </div>
   );
@@ -65,12 +58,14 @@ export function ProfileCard({
   className?: string;
 }) {
   return (
-    <section className={className}>
-      <div className="mb-1.5">
-        <h2 className={d.h2}>{title}</h2>
-        {description ? <p className={`mt-0.5 text-[0.75rem] leading-relaxed ${d.muted}`}>{description}</p> : null}
-      </div>
-      <div className={`overflow-hidden ${d.card}`}>{children}</div>
+    <section className={`space-y-2 ${className}`}>
+      {(title || description) && (
+        <div className="px-0.5">
+          {title ? <h2 className={d.groupTitle}>{title}</h2> : null}
+          {description ? <p className={d.groupDesc}>{description}</p> : null}
+        </div>
+      )}
+      <div className={`min-w-0 divide-y ${d.divider} ${d.insetGroup}`}>{children}</div>
     </section>
   );
 }
@@ -81,24 +76,124 @@ export function ProfileField({
   hint,
   children,
   divided,
+  stacked,
 }: {
   d: ProfileDesign;
   label: string;
   hint?: string;
   children: ReactNode;
   divided?: boolean;
+  /** Полная ширина подписи сверху (для textarea) */
+  stacked?: boolean;
 }) {
   return (
     <div
-      className={`grid gap-2 px-4 py-2.5 md:grid-cols-[8.75rem_minmax(0,1fr)] md:gap-5 md:py-3 ${
-        divided ? "border-t border-[var(--ph-separator)]" : ""
+      className={`px-4 py-3.5 sm:py-4 ${divided ? `border-t ${d.insetRow}` : ""} ${
+        stacked
+          ? "space-y-2"
+          : `grid gap-2 sm:grid-cols-[9.75rem_minmax(0,1fr)] sm:gap-x-6 sm:gap-y-1 ${
+              hint ? "sm:items-start" : "sm:items-center"
+            }`
       }`}
     >
-      <div className="min-w-0 md:pt-1">
-        <p className="text-[0.8125rem] text-[var(--ph-text)]">{label}</p>
+      <div className={`min-w-0 ${stacked ? "" : "sm:pt-0"}`}>
+        <p className="text-[0.8125rem] font-medium leading-snug text-[var(--ph-text)]">{label}</p>
         {hint ? <p className={`mt-0.5 text-[0.75rem] leading-relaxed ${d.muted}`}>{hint}</p> : null}
       </div>
-      <div className="min-w-0">{children}</div>
+      <div className="min-w-0 w-full [&_input]:w-full [&_select]:w-full [&_textarea]:w-full">{children}</div>
+    </div>
+  );
+}
+
+/** Поле ввода с префиксом (@, https:// …) — одна рамка, выровненная ширина с обычными input */
+export function ProfilePrefixedInput({
+  d,
+  prefix,
+  className = "",
+  ...props
+}: {
+  d: ProfileDesign;
+  prefix: string;
+  className?: string;
+} & Omit<InputHTMLAttributes<HTMLInputElement>, "className">) {
+  return (
+    <div
+      className={`flex w-full overflow-hidden ring-1 ring-[var(--ph-input-border)] transition focus-within:ring-2 focus-within:ring-[var(--ph-accent)]/30 ${d.rSm} bg-[var(--ph-input-bg)] ${className}`}
+    >
+      <span className="flex shrink-0 items-center border-r border-[var(--ph-input-border)] bg-[var(--ph-surface-elevated)] px-3 text-[0.8125rem] font-medium text-[var(--ph-muted)]">
+        {prefix}
+      </span>
+      <input
+        className="min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-[0.8125rem] leading-none text-[var(--ph-text)] outline-none placeholder:text-[var(--ph-muted)]"
+        {...props}
+      />
+    </div>
+  );
+}
+
+export function ProfileCharCount({ d, current, max }: { d: ProfileDesign; current: number; max: number }) {
+  return (
+    <p className={`mt-1.5 text-right text-[0.6875rem] tabular-nums ${d.muted}`}>
+      {current}/{max}
+    </p>
+  );
+}
+
+export function ProfileSelect({
+  d,
+  value,
+  onChange,
+  options,
+}: {
+  d: ProfileDesign;
+  value: string;
+  onChange: (value: string) => void;
+  options: readonly { value: string; label: string }[];
+}) {
+  return (
+    <select className={d.field()} value={value} onChange={(e) => onChange(e.target.value)}>
+      {options.map((opt) => (
+        <option key={opt.value || "__empty"} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/** Пустое состояние внутри inset-группы */
+export function ProfileInsetEmpty({ d, children }: { d: ProfileDesign; children: ReactNode }) {
+  return <p className={`px-4 py-8 text-center text-[0.875rem] leading-relaxed ${d.muted}`}>{children}</p>;
+}
+
+/** Строка со значением и действием справа */
+export function ProfileValueRow({
+  d,
+  label,
+  hint,
+  value,
+  action,
+  divided,
+}: {
+  d: ProfileDesign;
+  label: string;
+  hint?: string;
+  value: ReactNode;
+  action?: ReactNode;
+  divided?: boolean;
+}) {
+  return (
+    <div
+      className={`flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:py-4 ${
+        divided ? `border-t ${d.insetRow}` : ""
+      }`}
+    >
+      <div className="min-w-0">
+        <p className="text-[0.8125rem] font-medium text-[var(--ph-text)]">{label}</p>
+        {hint ? <p className={`mt-0.5 text-[0.75rem] ${d.muted}`}>{hint}</p> : null}
+        <div className={`mt-1 text-[0.875rem] ${d.muted}`}>{value}</div>
+      </div>
+      {action ? <div className="flex shrink-0 items-center">{action}</div> : null}
     </div>
   );
 }
@@ -125,26 +220,35 @@ export function ProfileMetrics({
 }
 
 export function ProfileActions({ children }: { d: ProfileDesign; children: ReactNode }) {
-  return <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-2.5 [&_a]:w-full sm:[&_a]:w-auto [&_button]:w-full sm:[&_button]:w-auto">{children}</div>;
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 [&_a]:w-full sm:[&_a]:w-auto [&_button]:w-full sm:[&_button]:w-auto">
+      {children}
+    </div>
+  );
 }
 
 export function ProfileListRow({
   d,
   to,
   title,
+  subtitle,
   badge,
 }: {
   d: ProfileDesign;
   to: string;
   title: string;
+  subtitle?: string;
   badge: { text: string; live: boolean };
 }) {
   return (
     <Link
       to={to}
-      className={`flex items-center justify-between gap-4 px-5 py-3.5 text-[0.9375rem] transition hover:bg-[var(--ph-nav-hover)] ${d.cardInset}`}
+      className={`flex items-center justify-between gap-4 px-4 py-3.5 transition hover:bg-[var(--ph-nav-hover)] sm:px-5 ${d.cardInset}`}
     >
-      <span className="font-medium text-[var(--ph-text)]">{title}</span>
+      <span className="min-w-0">
+        <span className="block truncate text-[0.875rem] font-medium text-[var(--ph-text)]">{title}</span>
+        {subtitle ? <span className={`mt-0.5 block truncate text-[0.75rem] ${d.muted}`}>{subtitle}</span> : null}
+      </span>
       <span className="flex shrink-0 items-center gap-2">
         <span className={`px-2 py-0.5 text-[0.6875rem] font-medium ${d.rFull} ${badge.live ? d.badgeLive : d.badgeDone}`}>
           {badge.text}
@@ -199,9 +303,7 @@ export function CompactColorRow({
               title={preset.label}
               onClick={() => onChange(preset.hex)}
               className={`h-7 w-7 shrink-0 rounded-full ring-1 ring-black/10 transition dark:ring-white/15 sm:h-8 sm:w-8 ${
-                active
-                  ? "ring-2 ring-[var(--ph-accent)] ring-offset-1 ring-offset-[var(--ph-surface)]"
-                  : "hover:scale-110"
+                active ? "ring-2 ring-inset ring-[var(--ph-accent)]" : "hover:scale-110"
               }`}
               style={{ backgroundColor: preset.hex }}
               aria-label={preset.label}
@@ -267,6 +369,7 @@ export function ProfileColorPicker({
   presets,
   normalize,
   pipetteLabel = "Свой цвет",
+  bare,
 }: {
   d: ProfileDesign;
   value: string;
@@ -274,10 +377,12 @@ export function ProfileColorPicker({
   presets: ProfileAccentPreset[];
   normalize: (raw: string) => string;
   pipetteLabel?: string;
+  /** Без внутренних отступов — когда уже внутри ProfileField */
+  bare?: boolean;
 }) {
   const norm = normalize(value);
   return (
-    <div className="space-y-3 px-4 py-3">
+    <div className={`min-w-0 max-w-full space-y-3 ${bare ? "" : "px-4 py-3"}`}>
       <div className="grid grid-cols-4 gap-2 sm:grid-cols-4 md:grid-cols-8">
         {presets.map((preset) => {
           const active = norm === preset.hex;
@@ -287,8 +392,8 @@ export function ProfileColorPicker({
               type="button"
               title={preset.label}
               onClick={() => onChange(preset.hex)}
-              className={`flex flex-col items-center gap-1.5 rounded-xl p-2 transition ${
-                active ? "ring-2 ring-[var(--ph-accent)] ring-offset-2 ring-offset-[var(--ph-surface)]" : "hover:bg-[var(--ph-nav-hover)]"
+              className={`flex min-w-0 flex-col items-center gap-1.5 rounded-xl p-2 transition ${
+                active ? "ring-2 ring-inset ring-[var(--ph-accent)]" : "hover:bg-[var(--ph-nav-hover)]"
               }`}
             >
               <span
@@ -302,9 +407,9 @@ export function ProfileColorPicker({
           );
         })}
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <label
-          className={`relative flex h-10 cursor-pointer items-center gap-2 overflow-hidden pl-1 pr-3 ring-1 ring-[var(--ph-border)] transition hover:bg-[var(--ph-nav-hover)] ${d.rSm}`}
+          className={`relative inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 overflow-hidden pl-1 pr-3 ring-1 ring-[var(--ph-border)] transition hover:bg-[var(--ph-nav-hover)] ${d.rSm}`}
           title={pipetteLabel}
         >
           <input
@@ -315,7 +420,7 @@ export function ProfileColorPicker({
           />
           <span className={`text-[0.8125rem] ${d.muted}`}>{pipetteLabel}</span>
         </label>
-        <span className={`font-mono text-[0.75rem] tabular-nums ${d.muted}`}>{norm}</span>
+        <span className={`shrink-0 font-mono text-[0.75rem] tabular-nums ${d.muted}`}>{norm}</span>
       </div>
     </div>
   );
@@ -349,7 +454,7 @@ export function CursorSegmented({
 }) {
   return (
     <div
-      className={`${stretch ? "flex w-full" : "inline-flex flex-wrap"} gap-0.5 p-0.5 ${d.inset} ${d.rSm}`}
+      className={`${stretch ? "flex h-9 w-full" : "inline-flex h-9 flex-wrap"} gap-0.5 p-0.5 ${d.inset} ${d.rSm}`}
       role="group"
       aria-label="Курсор"
     >
@@ -360,8 +465,8 @@ export function CursorSegmented({
             key={opt.id}
             type="button"
             onClick={() => onChange(opt.id)}
-            className={`font-medium transition ${d.rSm} ${
-              stretch ? "flex-1 px-2 py-2 text-center text-[0.75rem]" : compact ? "px-2 py-1 text-[0.6875rem]" : "px-3 py-1.5 text-xs"
+            className={`inline-flex items-center justify-center font-medium leading-none transition ${d.rSm} ${
+              stretch ? "h-full min-w-0 flex-1 px-2 text-[0.75rem]" : compact ? "h-full px-2.5 text-[0.6875rem]" : "h-full px-3 text-xs"
             } ${
               active
                 ? stretch
@@ -383,6 +488,32 @@ export function CursorSegmented({
 
 const RETRO_COLUMNS = ["Плюсы", "Минусы", "Действия"] as const;
 
+function PeerCursor({
+  className,
+  color,
+  label,
+  isLightBoard,
+}: {
+  className: string;
+  color: string;
+  label: string;
+  isLightBoard: boolean;
+}) {
+  return (
+    <div className={`pointer-events-none absolute z-20 flex max-w-[4.5rem] flex-col items-start ${className}`} aria-hidden>
+      <svg width="14" height="18" viewBox="0 0 14 18" className="shrink-0 drop-shadow-sm">
+        <path d="M1 1 L1 14 L5 10 L8 16 L10 15 L7 9 L12 9 Z" fill={color} stroke={isLightBoard ? "#fff" : "#18181b"} strokeWidth="0.75" />
+      </svg>
+      <span
+        className="mt-0.5 max-w-full truncate rounded px-1 py-px text-[0.5625rem] font-semibold text-white"
+        style={{ backgroundColor: color }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
 /** Превью оформления комнаты — только фон/шапка/обои, не аватар. */
 export function BoardPreviewPanel({
   d,
@@ -393,6 +524,7 @@ export function BoardPreviewPanel({
   avatarDataUrl,
   compact,
   fill,
+  studio,
 }: {
   d: ProfileDesign;
   boardBackdrop: string;
@@ -402,6 +534,8 @@ export function BoardPreviewPanel({
   avatarDataUrl: string | null;
   compact?: boolean;
   fill?: boolean;
+  /** Рамка «окна» + сетка и курсоры участников */
+  studio?: boolean;
 }) {
   const { bg: previewBg, header: previewHeader, isLightBoard } = resolveBoardPreviewColors(
     boardBackdrop,
@@ -413,19 +547,60 @@ export function BoardPreviewPanel({
 
   const previewClass = fill
     ? "relative min-h-[12rem] w-full flex-1 overflow-hidden rounded-lg md:min-h-0"
-    : compact
-      ? "relative min-h-[7.5rem] overflow-hidden rounded-lg ring-1 ring-[var(--ph-border)]"
-      : "relative min-h-[10rem] overflow-hidden rounded-xl ring-1 ring-[var(--ph-border)] sm:min-h-[11rem]";
+    : studio
+      ? "relative min-h-[10.5rem] overflow-hidden sm:min-h-[11.5rem]"
+      : compact
+        ? "relative min-h-[7.5rem] overflow-hidden rounded-lg ring-1 ring-[var(--ph-border)]"
+        : "relative min-h-[10rem] overflow-hidden rounded-xl ring-1 ring-[var(--ph-border)] sm:min-h-[11rem]";
+
+  const headerH = fill ? "h-10" : studio ? "h-8" : compact ? "h-7" : "h-9";
+  const boardPad = fill ? "gap-2 p-4 pt-12" : studio ? "gap-1.5 p-3 pt-10" : compact ? "gap-1 p-2 pt-8" : "gap-1.5 p-3 pt-11";
+
+  const dotGrid = isLightBoard
+    ? "radial-gradient(circle, rgb(0 0 0 / 0.06) 1px, transparent 1px)"
+    : "radial-gradient(circle, rgb(255 255 255 / 0.07) 1px, transparent 1px)";
 
   return (
-    <div className={`w-full ${fill ? "flex min-h-0 flex-1 flex-col" : ""}`} aria-label="Превью доски ретро">
+    <div
+      className={`min-w-0 max-w-full overflow-hidden ${fill ? "flex min-h-0 w-full flex-1 flex-col" : "w-full"}`}
+      aria-label="Превью доски ретро"
+    >
       <div
-          className={previewClass}
+        className={
+          studio
+            ? `min-w-0 max-w-full overflow-hidden ${d.rSm} bg-[var(--ph-surface-elevated)] p-2 ring-1 ring-inset ring-[var(--ph-border)]`
+            : ""
+        }
+      >
+        {studio ? (
+          <div className="mb-2 flex items-center gap-2 px-1">
+            <span className="flex gap-1" aria-hidden>
+              <span className="h-2 w-2 rounded-full bg-red-400/90" />
+              <span className="h-2 w-2 rounded-full bg-amber-400/90" />
+              <span className="h-2 w-2 rounded-full bg-emerald-400/90" />
+            </span>
+            <span
+              className={`min-w-0 flex-1 truncate rounded-md px-2 py-0.5 text-center font-mono text-[0.625rem] ${d.muted} bg-[var(--ph-surface)] ring-1 ring-[var(--ph-border)]`}
+            >
+              retrogen.app/r/demo
+            </span>
+          </div>
+        ) : null}
+        <div
+          className={`${previewClass} max-w-full ${studio ? `${d.rSm} ring-1 ring-black/10 dark:ring-white/10` : ""}`}
           style={{
             background: previewBg,
             cursor: cursorCss(cursorStyle),
           }}
         >
+          <div
+            className="pointer-events-none absolute inset-0 opacity-80"
+            style={{
+              backgroundImage: dotGrid,
+              backgroundSize: "14px 14px",
+            }}
+            aria-hidden
+          />
           {hasWallpaper ? (
             <div
               className="pointer-events-none absolute inset-0 opacity-40"
@@ -438,14 +613,36 @@ export function BoardPreviewPanel({
             />
           ) : null}
           <div
-            className={`absolute inset-x-0 top-0 z-10 border-b border-black/5 ${fill ? "h-10" : compact ? "h-7" : "h-9"}`}
+            className={`absolute inset-x-0 top-0 z-10 flex items-center border-b border-black/8 px-2 ${headerH}`}
             style={{ background: previewHeader }}
-          />
-          <div
-            className={`absolute inset-0 z-[1] flex items-stretch ${
-              fill ? "gap-2 p-4 pt-12" : compact ? "gap-1 p-2 pt-8" : "gap-1.5 p-3 pt-11"
-            }`}
           >
+            {studio ? (
+              <span
+                className={`truncate text-[0.625rem] font-medium ${
+                  isLightBoard ? "text-zinc-600" : "text-zinc-300"
+                }`}
+              >
+                Спринт · Ретро
+              </span>
+            ) : null}
+          </div>
+          {studio ? (
+            <>
+              <PeerCursor
+                className="left-[18%] top-[42%]"
+                color="#0ea5e9"
+                label="А"
+                isLightBoard={isLightBoard}
+              />
+              <PeerCursor
+                className="right-[28%] top-[55%]"
+                color="#f43f5e"
+                label="К"
+                isLightBoard={isLightBoard}
+              />
+            </>
+          ) : null}
+          <div className={`absolute inset-0 z-[1] flex items-stretch ${boardPad}`}>
             {RETRO_COLUMNS.map((t) => (
               <div
                 key={t}
@@ -467,14 +664,15 @@ export function BoardPreviewPanel({
             ))}
           </div>
           <div
-            className={`absolute bottom-3 right-3 z-10 max-w-[7rem] rounded-lg px-2 py-1.5 text-[0.6875rem] font-medium leading-snug shadow-md ${
+            className={`absolute bottom-3 right-3 z-10 max-w-[min(7rem,40%)] rounded-lg px-2 py-1.5 text-[0.6875rem] font-medium leading-snug shadow-md ${
               isLightBoard ? "bg-amber-200/95 text-amber-950" : "bg-amber-400/95 text-amber-950"
             }`}
           >
-            Стикер
+            {studio ? "Идея для Q2" : "Стикер"}
           </div>
         </div>
-      {!compact && !fill ? (
+      </div>
+      {!compact && !fill && !studio ? (
         <p className={`mt-2 text-[0.75rem] ${d.muted}`}>
           {hasWallpaper ? "Обои поверх фона (40%)." : "Только цвет фона и шапки."}
         </p>

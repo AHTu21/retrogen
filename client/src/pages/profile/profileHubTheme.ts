@@ -3,7 +3,7 @@ export type ProfileSectionId =
   | "identity"
   | "room"
   | "lobby"
-  | "facilitator"
+  | "notepad"
   | "notifications"
   | "organization"
   | "billing"
@@ -17,53 +17,66 @@ export type ProfileNavItem = {
   locked?: boolean;
   lockReason?: string;
   guestHidden?: boolean;
+  /** Скрыто из sidebar до релиза функции */
+  navHidden?: boolean;
 };
 
 export const PROFILE_NAV: ProfileNavItem[] = [
-  { id: "overview", label: "Обзор", hint: "Сводка и быстрые действия" },
-  { id: "identity", label: "Личные данные", hint: "Имя, контакты, подпись" },
-  { id: "room", label: "Доска", hint: "Оформление комнаты ретро" },
-  { id: "lobby", label: "Лобби", hint: "История и избранное" },
-  { id: "facilitator", label: "Фасилитатор", hint: "Сессии и блокнот" },
+  { id: "overview", label: "Обзор", hint: "Приветствие, сводка, быстрые действия и прогресс профиля" },
+  { id: "identity", label: "Личные данные", hint: "Имя, роль и ссылки — как вас видят в комнате" },
+  { id: "room", label: "Оформление доски", hint: "Готовые темы, палитра комнаты, курсор и обои — с живым превью" },
+  { id: "lobby", label: "Лобби и комнаты", hint: "Избранное, история посещений и быстрый вход в лобби" },
+  { id: "notepad", label: "Блокнот", hint: "Личные заметки, шаблоны вставок и автосохранение" },
   {
     id: "notifications",
     label: "Уведомления",
     locked: true,
+    navHidden: true,
     lockReason: "Email о завершении ретро — в roadmap",
   },
   {
     id: "organization",
     label: "Организация",
     locked: true,
-    lockReason: "Team+ и white-label (ВТБ, МТС)",
+    navHidden: true,
     guestHidden: true,
+    lockReason: "Team+ и white-label (ВТБ, МТС)",
   },
   {
     id: "billing",
     label: "Тариф",
     locked: true,
-    lockReason: "Модули IAM, AI, ARCH",
+    navHidden: true,
     guestHidden: true,
+    lockReason: "Модули IAM, AI, ARCH",
   },
-  { id: "security", label: "Безопасность", hint: "Вход и сессии" },
-  { id: "danger", label: "Опасная зона", hint: "Экспорт и удаление", guestHidden: true },
+  { id: "security", label: "Безопасность", hint: "Сессия, защита аккаунта и конфиденциальность" },
+  { id: "danger", label: "Опасная зона", hint: "Экспорт данных и удаление аккаунта", guestHidden: true },
 ];
 
+/** Только видимые в sidebar пункты */
+export const PROFILE_NAV_VISIBLE = PROFILE_NAV.filter((n) => !n.navHidden);
+
 export const PROFILE_NAV_GROUPS: { title: string; ids: ProfileSectionId[] }[] = [
-  { title: "Личное", ids: ["overview", "identity", "room", "lobby", "facilitator"] },
-  { title: "Организация", ids: ["notifications", "organization", "billing"] },
+  { title: "Профиль", ids: ["overview", "identity", "room", "lobby", "notepad"] },
   { title: "Система", ids: ["security", "danger"] },
 ];
+
+const HASH_ALIASES: Record<string, ProfileSectionId> = {
+  facilitator: "notepad",
+};
 
 export const DEFAULT_PROFILE_SECTION: ProfileSectionId = "overview";
 
 export function parseProfileHash(): ProfileSectionId {
   const raw = window.location.hash.replace(/^#/, "");
-  const hit = PROFILE_NAV.find((n) => n.id === raw);
-  return hit && !hit.locked ? hit.id : DEFAULT_PROFILE_SECTION;
+  const id = (HASH_ALIASES[raw] ?? raw) as ProfileSectionId;
+  const hit = PROFILE_NAV.find((n) => n.id === id);
+  if (!hit || hit.locked || hit.navHidden) return DEFAULT_PROFILE_SECTION;
+  return hit.id;
 }
 
-/** Оболочка в стиле Home (zinc + sky); акцент — через --ph-accent на .profile-hub */
+/** @deprecated legacy shell tokens */
 export function profileShell(isLight: boolean) {
   return {
     page: isLight ? "bg-zinc-50 text-zinc-900" : "bg-zinc-950 text-zinc-100",
@@ -105,7 +118,6 @@ export function fieldClass(isLight: boolean, extra = "") {
   return `w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30 ${s.input} ${extra}`;
 }
 
-/** @deprecated use profileShell */
 export function hubClasses(isLight: boolean) {
   const s = profileShell(isLight);
   return {
