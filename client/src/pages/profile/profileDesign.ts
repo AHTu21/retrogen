@@ -1,155 +1,109 @@
-/** Единая дизайн-система страницы профиля Retrogen (System Settings / Apple HIG). */
-
-
+/**
+ * Дизайн-система профиля Retrogen.
+ * Паттерн: macOS System Settings / SAP Fiori list-detail — sidebar ~240px + detail pane.
+ */
 
 export type ProfileDesign = {
-
   isLight: boolean;
-
   r: string;
-
   rSm: string;
-
+  rMd: string;
   rFull: string;
-
   page: string;
-
   topBar: string;
-
-  shell: string;
-
-  rail: string;
-
-  railWidth: string;
-
-  railPad: string;
-
-  railDivider: string;
-
-  identityPane: string;
-  identityCard: string;
-
-  main: string;
-
-  mainPad: string;
-
+  window: string;
+  sidebar: string;
+  sidebarWidth: string;
+  sidebarScroll: string;
+  detail: string;
+  detailInner: string;
+  groupTitle: string;
+  groupDesc: string;
+  pageTitle: string;
+  pageLead: string;
+  insetGroup: string;
+  insetRow: string;
   card: string;
-
   cardInset: string;
-
-  cardHeader: string;
-
-  cardBody: string;
-
   sectionTitle: string;
-
   sectionHint: string;
-
   inset: string;
-
   divider: string;
-
   eyebrow: string;
-
   h1: string;
-
   h2: string;
-
   muted: string;
-
   label: string;
-
   link: string;
-
   input: string;
-
-  navGroup: string;
-
+  navSection: string;
   navActive: string;
-
   navIdle: string;
-
+  navDanger: string;
   navLocked: string;
-
   btnPrimary: string;
-
   btnSecondary: string;
-
+  btnAction: string;
   btnGhost: string;
-
   noticeInfo: string;
-
   noticeDanger: string;
-
+  noticeBanner: string;
   badgeLive: string;
-
   badgeDone: string;
-
   statTile: string;
-
+  savePill: string;
+  savePillActive: string;
   field: (extra?: string) => string;
-
 };
 
-
-
 export function createProfileDesign(isLight: boolean, isRounded: boolean): ProfileDesign {
-
   const r = isRounded ? "rounded-2xl" : "rounded-lg";
-
   const rSm = isRounded ? "rounded-xl" : "rounded-md";
-
+  const rMd = isRounded ? "rounded-[0.875rem]" : "rounded-md";
   const rFull = isRounded ? "rounded-full" : "rounded-none";
-
-
-
-  const text = "text-[var(--ph-text)]";
 
   const muted = "text-[var(--ph-muted)]";
 
-
-
   return {
-
     isLight,
-
     r,
-
     rSm,
-
+    rMd,
     rFull,
 
-    page: `min-h-screen antialiased ${text} bg-[var(--ph-page-bg)]`,
+    page: "min-h-dvh antialiased text-[var(--ph-text)] bg-[var(--ph-page-bg)]",
 
     topBar:
-
       "border-b border-[var(--ph-border)] bg-[var(--ph-sticky-bg)] backdrop-blur-xl backdrop-saturate-150 supports-[backdrop-filter]:bg-[var(--ph-sticky-bg)]",
 
-    shell: `overflow-hidden ${r} bg-[var(--ph-panel-bg)] [box-shadow:var(--ph-shadow)] ring-1 ring-[var(--ph-border)] max-lg:overflow-visible`,
+    window: `flex flex-col ${rMd} bg-[var(--ph-panel-bg)] [box-shadow:var(--ph-shadow)] ring-1 ring-[var(--ph-border)] lg:flex-row lg:items-start`,
 
-    rail: "bg-[var(--ph-sidebar-bg)]",
+    sidebar:
+      "flex w-full shrink-0 flex-col bg-[var(--ph-sidebar-bg)] lg:sticky lg:top-24 lg:w-[15.5rem] lg:self-start lg:border-r lg:border-[var(--ph-separator)] xl:w-[16.25rem]",
 
-    railWidth:
-      "w-full shrink-0 lg:grid lg:w-[26.75rem] lg:grid-cols-[12.25rem_14.5rem] lg:grid-rows-1 lg:items-stretch",
+    sidebarWidth: "",
 
-    railPad: "px-2 pt-4 pb-3",
+    sidebarScroll: "flex flex-col",
 
-    railDivider: "border-[var(--ph-separator)]",
+    detail: "flex min-w-0 flex-1 flex-col bg-[var(--ph-panel-bg)]",
 
-    identityPane: "flex h-full min-h-0 flex-col border-l border-[var(--ph-separator)] px-3 pb-4 pt-4",
-    identityCard: `flex h-full min-h-0 flex-1 flex-col overflow-hidden ${rSm} bg-[var(--ph-surface-elevated)]/50`,
+    detailInner: "mx-auto w-full max-w-[42rem] min-w-0 px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7",
 
-    main: "flex min-h-0 min-w-0 flex-1 flex-col bg-[var(--ph-panel-bg)]",
+    groupTitle: "text-[0.8125rem] font-semibold tracking-[-0.01em] text-[var(--ph-text)]",
 
-    mainPad: "px-4 py-4 sm:px-6 lg:px-8 lg:py-6",
+    groupDesc: `mt-0.5 text-[0.75rem] leading-relaxed ${muted}`,
 
-    card: `${rSm} bg-[var(--ph-surface)] ring-1 ring-[var(--ph-border)]`,
+    pageTitle: "text-[1.625rem] font-semibold tracking-[-0.03em] text-[var(--ph-text)] sm:text-[1.75rem]",
+
+    pageLead: `mt-2 max-w-lg text-[0.9375rem] leading-relaxed ${muted}`,
+
+    insetGroup: `${rSm} overflow-hidden bg-[var(--ph-surface)] ring-1 ring-[var(--ph-border)]`,
+
+    insetRow: "border-[var(--ph-separator)]",
+
+    card: `${rSm} overflow-hidden bg-[var(--ph-surface)] ring-1 ring-[var(--ph-border)]`,
 
     cardInset: "first:rounded-t-[inherit] last:rounded-b-[inherit]",
-
-    cardHeader: "px-5 pt-4 pb-1",
-
-    cardBody: "px-0 pb-1",
 
     sectionTitle: "text-[1.25rem] font-semibold tracking-[-0.02em] text-[var(--ph-text)] sm:text-[1.375rem]",
 
@@ -159,66 +113,65 @@ export function createProfileDesign(isLight: boolean, isRounded: boolean): Profi
 
     divider: "divide-[var(--ph-separator)]",
 
-    eyebrow: `text-[0.75rem] font-medium ${muted}`,
+    eyebrow: `text-[0.6875rem] font-semibold uppercase tracking-[0.06em] ${muted}`,
 
     h1: "text-[1.375rem] font-semibold tracking-[-0.02em] text-[var(--ph-text)]",
 
     h2: "text-[0.8125rem] font-semibold text-[var(--ph-text)]",
 
     muted,
-
     label: `text-[0.75rem] font-medium ${muted}`,
 
-    link: "font-medium text-[var(--ph-link)] hover:opacity-80",
+    link: "font-medium text-[var(--ph-link)] transition hover:opacity-80",
 
     input:
-
       "border-[var(--ph-input-border)] bg-[var(--ph-input-bg)] text-[var(--ph-text)] placeholder:text-[var(--ph-muted)]",
 
-    navGroup: `px-3 pb-1 pt-4 text-[0.6875rem] font-semibold tracking-wide ${muted} first:pt-0`,
+    navSection: `px-3 pb-1 pt-5 text-[0.6875rem] font-semibold tracking-wide ${muted} first:pt-3`,
 
     navActive:
-      "mx-1.5 bg-[var(--ph-nav-active-bg)] font-medium text-[var(--ph-nav-active-text)]",
+      "flex w-full items-center gap-2.5 rounded-lg bg-[var(--ph-nav-active-bg)] px-2.5 py-2 text-left text-[0.8125rem] font-medium text-[var(--ph-nav-active-text)] transition",
 
     navIdle:
-      "mx-1.5 font-normal text-[var(--ph-nav-idle)] hover:bg-[var(--ph-nav-hover)] hover:text-[var(--ph-text)]",
+      "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[0.8125rem] font-normal text-[var(--ph-nav-idle)] transition hover:bg-[var(--ph-nav-hover)] hover:text-[var(--ph-text)]",
 
-    navLocked: `font-normal ${muted} opacity-50`,
+    navDanger:
+      "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[0.8125rem] font-normal text-red-600 transition hover:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/15",
 
-    btnPrimary: `inline-flex items-center justify-center px-3.5 py-1.5 text-[0.8125rem] font-medium text-white transition hover:opacity-95 active:scale-[0.98] ${rSm} bg-[var(--ph-btn-bg)]`,
+    navLocked: `flex w-full cursor-not-allowed items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[0.8125rem] font-normal ${muted} opacity-45`,
 
-    btnSecondary: `inline-flex items-center justify-center px-3.5 py-1.5 text-[0.8125rem] font-medium transition active:scale-[0.98] ${rSm} bg-[var(--ph-surface-elevated)] text-[var(--ph-text)] ring-1 ring-[var(--ph-border)] hover:bg-[var(--ph-nav-hover)]`,
+    btnPrimary: `inline-flex h-9 min-h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-4 text-[0.8125rem] font-medium leading-none text-white transition hover:opacity-95 active:scale-[0.98] ${rSm} bg-[var(--ph-btn-bg)]`,
 
-    btnGhost: `text-[0.75rem] font-medium text-[var(--ph-link)] transition hover:opacity-75`,
+    btnSecondary: `inline-flex h-9 min-h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-4 text-[0.8125rem] font-medium leading-none transition active:scale-[0.98] ${rSm} bg-[var(--ph-surface-elevated)] text-[var(--ph-text)] ring-1 ring-[var(--ph-border)] hover:bg-[var(--ph-nav-hover)]`,
+
+    /** Фиксированная ширина для пар кнопок в строках настроек (Опасная зона и т.п.) */
+    btnAction: `inline-flex h-9 min-h-9 w-[9.5rem] shrink-0 items-center justify-center whitespace-nowrap px-4 text-[0.8125rem] font-medium leading-none transition active:scale-[0.98] ${rSm} bg-[var(--ph-surface-elevated)] text-[var(--ph-text)] ring-1 ring-[var(--ph-border)] hover:bg-[var(--ph-nav-hover)]`,
+
+    btnGhost: `inline-flex h-9 min-h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-4 text-[0.8125rem] font-medium leading-none text-[var(--ph-link)] transition hover:bg-[var(--ph-nav-hover)] active:scale-[0.98] ${rSm}`,
 
     noticeInfo: isLight
-
       ? "bg-amber-500/10 text-amber-950 ring-1 ring-amber-500/20"
-
       : "bg-amber-500/10 text-amber-100 ring-1 ring-amber-500/25",
 
     noticeDanger: isLight
-
       ? "bg-red-500/8 text-red-950 ring-1 ring-red-500/20"
-
       : "bg-red-500/10 text-red-100 ring-1 ring-red-500/25",
 
-    badgeLive: isLight
+    noticeBanner: isLight
+      ? "border border-amber-500/25 bg-amber-500/8 text-amber-950"
+      : "border border-amber-500/30 bg-amber-500/10 text-amber-100",
 
-      ? "bg-emerald-500/12 text-emerald-800"
-
-      : "bg-emerald-400/15 text-emerald-300",
+    badgeLive: isLight ? "bg-emerald-500/12 text-emerald-800" : "bg-emerald-400/15 text-emerald-300",
 
     badgeDone: isLight ? "bg-black/5 text-[var(--ph-muted)]" : "bg-white/8 text-[var(--ph-muted)]",
 
-    statTile: `${rSm} bg-[var(--ph-surface)] px-4 py-3 ring-1 ring-[var(--ph-border)]`,
+    statTile: `${rSm} bg-[var(--ph-surface)] px-4 py-3.5 ring-1 ring-[var(--ph-border)]`,
+
+    savePill: `hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.75rem] font-medium sm:inline-flex ${muted} bg-[var(--ph-surface-elevated)] ring-1 ring-[var(--ph-border)]`,
+
+    savePillActive: `hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.75rem] font-medium sm:inline-flex text-[var(--ph-accent)] bg-[var(--ph-nav-active-bg)]`,
 
     field: (extra = "") =>
-
       `w-full border px-3 py-2 text-[0.8125rem] outline-none transition focus:ring-2 focus:ring-[var(--ph-accent)]/30 ${rSm} ${extra} border-[var(--ph-input-border)] bg-[var(--ph-input-bg)] text-[var(--ph-text)] placeholder:text-[var(--ph-muted)]`,
-
   };
-
 }
-
-

@@ -15,12 +15,13 @@ import {
 import { getFavoriteSlugs, getVisitedRooms } from "../lib/roomLobbyPrefs";
 import { useAppCorners, useAppTheme } from "../theme";
 import { createProfileDesign } from "./profile/profileDesign";
-import { ProfileIdentityColumn } from "./profile/ProfileIdentityColumn";
+import { ProfileSidebar } from "./profile/ProfileSidebar";
 import { ProfileSectionPanels } from "./profile/ProfileSectionPanels";
 import {
   DEFAULT_PROFILE_SECTION,
   parseProfileHash,
   PROFILE_NAV,
+  PROFILE_NAV_VISIBLE,
   type ProfileSectionId,
 } from "./profile/profileHubTheme";
 
@@ -51,7 +52,7 @@ export function ProfilePage() {
   const isDirty = JSON.stringify(prefs) !== savedSnapshot;
 
   const navItems = useMemo(
-    () => PROFILE_NAV.filter((n) => !n.guestHidden || authUser),
+    () => PROFILE_NAV_VISIBLE.filter((n) => !n.guestHidden || authUser),
     [authUser],
   );
 
@@ -72,13 +73,16 @@ export function ProfilePage() {
     }
   }, [authUser, section]);
 
-  const goSection = useCallback((id: ProfileSectionId) => {
-    const item = PROFILE_NAV.find((n) => n.id === id);
-    if (item?.locked) return;
-    if (item?.guestHidden && !authUser) return;
-    window.location.hash = id;
-    setSection(id);
-  }, [authUser]);
+  const goSection = useCallback(
+    (id: ProfileSectionId) => {
+      const item = PROFILE_NAV.find((n) => n.id === id);
+      if (item?.locked || item?.navHidden) return;
+      if (item?.guestHidden && !authUser) return;
+      window.location.hash = id;
+      setSection(id);
+    },
+    [authUser],
+  );
 
   const commit = useCallback((next: UserProfilePrefs) => {
     const safe = saveProfilePrefs(next);
@@ -141,7 +145,8 @@ export function ProfilePage() {
   const profileHelpBody = (
     <>
       <p className="opacity-90">
-        Единый центр настроек: слева навигация по группам, справа — формы в одном стиле. Изменения сохраняются в браузере автоматически.
+        Центр настроек в стиле System Settings: слева профиль и разделы, справа — формы. Изменения сохраняются в браузере
+        автоматически.
       </p>
       <p className="mt-3 opacity-90">После входа настройки можно будет синхронизировать с аккаунтом (PLAN §12).</p>
     </>
@@ -154,22 +159,40 @@ export function ProfilePage() {
       onHelpOpenCloseAbout={() => setAboutOpen(false)}
       body={profileHelpBody}
     >
-      <div className={`profile-app flex min-h-dvh flex-col overflow-x-hidden ${d.page}`} style={accentStyle}>
-        <div className="mx-auto flex min-h-0 w-full max-w-[100rem] flex-1 flex-col px-3 py-3 sm:px-5 sm:py-4 lg:px-8 lg:py-5">
+      <div className={`profile-app min-h-dvh ${d.page}`} style={accentStyle}>
+        <div className="mx-auto flex w-full max-w-[72rem] flex-col px-3 py-3 sm:px-5 sm:py-4 lg:px-6 lg:py-5">
           <header
-            className={`sticky top-0 z-30 -mx-3 mb-4 flex flex-wrap items-center justify-between gap-2 px-3 py-3 sm:-mx-5 sm:mb-6 sm:gap-3 sm:px-5 sm:py-3.5 lg:-mx-6 lg:px-6 ${d.topBar}`}
+            className={`sticky top-0 z-30 -mx-3 mb-4 flex flex-wrap items-center justify-between gap-3 px-3 py-3 sm:-mx-5 sm:px-5 lg:-mx-6 lg:mb-5 lg:px-6 ${d.topBar}`}
           >
-            <Link to="/home" className="group transition hover:opacity-80">
+            <Link to="/home" className="group min-w-0 transition hover:opacity-80">
               <p className={d.eyebrow}>Retrogen</p>
-              <p className="mt-0.5 text-[1.0625rem] font-semibold tracking-[-0.01em] text-[var(--ph-text)] group-hover:text-[var(--ph-link)]">
+              <p className="mt-0.5 text-[1.0625rem] font-semibold tracking-[-0.02em] text-[var(--ph-text)] group-hover:text-[var(--ph-link)]">
                 Настройки
               </p>
             </Link>
             <div className="flex flex-wrap items-center gap-2.5">
-              {savedHint ? (
-                <span className="text-[0.8125rem] font-medium text-[var(--ph-accent)]">{savedHint}</span>
-              ) : isDirty ? (
-                <span className={`text-[0.8125rem] ${d.muted}`}>Сохранение…</span>
+              {savedHint || isDirty ? (
+                <span
+                  className={savedHint ? d.savePillActive : d.savePill}
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  {savedHint ? (
+                    <>
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                        <path
+                          fillRule="evenodd"
+                          d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.42 0l-3.25-3.25a1 1 0 111.42-1.42l2.54 2.54 6.54-6.54a1 1 0 011.42 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      {savedHint}
+                    </>
+                  ) : (
+                    "Сохранение…"
+                  )}
+                </span>
               ) : null}
               <ThemeCornersIconButtons
                 isLight={isLight}
@@ -192,7 +215,7 @@ export function ProfilePage() {
           </header>
 
           {!authUser ? (
-            <p className={`mb-6 px-4 py-3 text-[0.9375rem] ${d.noticeInfo} ${d.rSm}`}>
+            <p className={`mb-4 px-4 py-3 text-[0.875rem] ${d.noticeBanner} ${d.rSm}`}>
               Гостевой режим — настройки только в этом браузере.{" "}
               <Link to="/login" className={d.link}>
                 Войти
@@ -200,8 +223,8 @@ export function ProfilePage() {
             </p>
           ) : null}
 
-          <div className={`flex min-h-0 flex-1 flex-col ${d.shell} lg:flex-row lg:items-stretch lg:overflow-hidden`}>
-            <ProfileIdentityColumn
+          <div className={d.window}>
+            <ProfileSidebar
               d={d}
               prefs={prefs}
               authUser={authUser}
@@ -212,31 +235,30 @@ export function ProfilePage() {
               onGoSection={goSection}
               onAvatarFile={onAvatarFile}
             />
-            <main
-              className={`${d.main} ${d.mainPad} flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain`}
-              id="retrogen-profile-settings"
-            >
-              <ProfileSectionPanels
-                d={d}
-                section={section}
-                prefs={prefs}
-                setPrefs={setPrefs}
-                authUser={authUser}
-                visited={visited}
-                visitedCount={visitedCount}
-                favoriteCount={favoriteCount}
-                onWallpaperFile={onWallpaperFile}
-                onGoSection={goSection}
-                onLogout={() => {
-                  logoutAccount();
-                  setAuthUser(null);
-                  navigate("/", { replace: true });
-                }}
-              />
+
+            <main className={d.detail} id="retrogen-profile-settings">
+              <div className={d.detailInner}>
+                <ProfileSectionPanels
+                  d={d}
+                  section={section}
+                  prefs={prefs}
+                  setPrefs={setPrefs}
+                  authUser={authUser}
+                  visited={visited}
+                  visitedCount={visitedCount}
+                  favoriteCount={favoriteCount}
+                  onWallpaperFile={onWallpaperFile}
+                  onGoSection={goSection}
+                  onLogout={() => {
+                    logoutAccount();
+                    setAuthUser(null);
+                    navigate("/", { replace: true });
+                  }}
+                />
+              </div>
             </main>
           </div>
         </div>
-
       </div>
       <RetrogenDockableAbout open={aboutOpen} onClose={() => setAboutOpen(false)} isLight={isLight} />
     </RetrogenDockableHelpRoot>

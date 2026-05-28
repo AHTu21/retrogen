@@ -12,13 +12,29 @@ export type CursorStyle = "default" | "crosshair" | "pointer" | "grab";
 
 export type UserProfilePrefs = {
   displayName: string;
-  contact: string;
-  gender: string;
-  city: string;
-  birthDate: string;
-  /** многострочный список устройств */
-  devices: string;
+  /** Коротко о себе — видно в комнате */
   signature: string;
+  /** Роль или должность, напр. «Фасилитатор», «Product» */
+  roleTitle: string;
+  /** Команда, продукт или компания */
+  teamName: string;
+  /** Местоимения, напр. он/его — по желанию */
+  pronouns: string;
+  city: string;
+  /** Часовой пояс, напр. Europe/Moscow */
+  timezone: string;
+  /** Telegram без @ */
+  telegram: string;
+  /** Сайт или LinkedIn */
+  website: string;
+  /** Телефон или другой контакт одной строкой */
+  contact: string;
+  /** @deprecated не показывается в UI, оставлено для старых данных */
+  gender: string;
+  /** @deprecated */
+  birthDate: string;
+  /** @deprecated */
+  devices: string;
   notepad: string;
   /** CSS color e.g. #e2e8f0 or transparent */
   boardBackdrop: string;
@@ -35,12 +51,18 @@ export type UserProfilePrefs = {
 
 const defaultPrefs: UserProfilePrefs = {
   displayName: "",
+  signature: "",
+  roleTitle: "",
+  teamName: "",
+  pronouns: "",
+  city: "",
+  timezone: "",
+  telegram: "",
+  website: "",
   contact: "",
   gender: "",
-  city: "",
   birthDate: "",
   devices: "",
-  signature: "",
   notepad: "",
   boardBackdrop: "",
   headerTint: "",
@@ -104,12 +126,26 @@ export function loadProfilePrefs(): UserProfilePrefs {
     const p = JSON.parse(raw) as Partial<UserProfilePrefs>;
     const loaded: UserProfilePrefs = {
       displayName: typeof p.displayName === "string" ? p.displayName : "",
+      signature: typeof p.signature === "string" ? p.signature : "",
+      roleTitle: typeof p.roleTitle === "string" ? p.roleTitle : "",
+      teamName: typeof p.teamName === "string" ? p.teamName : "",
+      pronouns: (() => {
+        const v = typeof p.pronouns === "string" ? p.pronouns.trim() : "";
+        const legacy: Record<string, string> = {
+          "he/him": "он/его",
+          "she/her": "она/неё",
+          "they/them": "они/их",
+        };
+        return legacy[v] ?? v;
+      })(),
+      city: typeof p.city === "string" ? p.city : "",
+      timezone: typeof p.timezone === "string" ? p.timezone : "",
+      telegram: typeof p.telegram === "string" ? p.telegram : "",
+      website: typeof p.website === "string" ? p.website : "",
       contact: typeof p.contact === "string" ? p.contact : "",
       gender: typeof p.gender === "string" ? p.gender : "",
-      city: typeof p.city === "string" ? p.city : "",
       birthDate: typeof p.birthDate === "string" ? p.birthDate : "",
       devices: typeof p.devices === "string" ? p.devices : "",
-      signature: typeof p.signature === "string" ? p.signature : "",
       notepad: typeof p.notepad === "string" ? p.notepad : "",
       boardBackdrop: typeof p.boardBackdrop === "string" ? p.boardBackdrop : "",
       headerTint: typeof p.headerTint === "string" ? p.headerTint : "",
