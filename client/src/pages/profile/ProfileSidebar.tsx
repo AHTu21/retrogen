@@ -95,7 +95,7 @@ function SidebarNav({
   }
 
   return (
-    <nav className="hidden px-2 pb-4 lg:block" aria-label="Разделы настроек">
+    <nav className="hidden px-2 pb-4 lg:block" aria-label="Разделы настроек" title="Alt+↑ / Alt+↓ — переключение разделов">
       {PROFILE_NAV_GROUPS.map((group) => {
         const items = group.ids.map((id) => navById.get(id)).filter((n): n is ProfileNavItem => !!n);
         if (!items.length) return null;

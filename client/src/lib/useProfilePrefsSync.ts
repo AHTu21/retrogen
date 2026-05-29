@@ -25,7 +25,7 @@ export function useProfilePrefsSync() {
   }, [refresh]);
 
   const commit = useCallback((next: UserProfilePrefs) => {
-    const saved = saveProfilePrefs(next);
+    const { prefs: saved } = saveProfilePrefs(next);
     setPrefs(saved);
     notifyProfilePrefsChanged();
     return saved;

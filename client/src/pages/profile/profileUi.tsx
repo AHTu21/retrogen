@@ -2,7 +2,13 @@ import type { InputHTMLAttributes, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { normalizeProfileAccent, PROFILE_ACCENT_PRESETS, type ProfileAccentPreset } from "../../lib/profileAccent";
 import type { CursorStyle } from "../../lib/profilePrefs";
-import { cursorCss, effectiveBoardWallpaper } from "../../lib/profilePrefs";
+import {
+  DEFAULT_WALLPAPER_OPACITY,
+  cursorCss,
+  effectiveBoardWallpaper,
+  normalizeWallpaperOpacity,
+  wallpaperOpacityFraction,
+} from "../../lib/profilePrefs";
 import { resolveBoardPreviewColors } from "../../lib/profileRoomColors";
 import type { ProfileDesign } from "./profileDesign";
 import { PROFILE_NAV, type ProfileSectionId } from "./profileHubTheme";
@@ -522,6 +528,7 @@ export function BoardPreviewPanel({
   cursorStyle,
   wallpaperDataUrl,
   avatarDataUrl,
+  wallpaperOpacity = DEFAULT_WALLPAPER_OPACITY,
   compact,
   fill,
   studio,
@@ -532,6 +539,7 @@ export function BoardPreviewPanel({
   cursorStyle: CursorStyle;
   wallpaperDataUrl: string | null;
   avatarDataUrl: string | null;
+  wallpaperOpacity?: number;
   compact?: boolean;
   fill?: boolean;
   /** Рамка «окна» + сетка и курсоры участников */
@@ -544,6 +552,7 @@ export function BoardPreviewPanel({
   );
   const wallpaper = effectiveBoardWallpaper({ wallpaperDataUrl, avatarDataUrl });
   const hasWallpaper = !!wallpaper;
+  const wallpaperAlpha = wallpaperOpacityFraction(normalizeWallpaperOpacity(wallpaperOpacity));
 
   const previewClass = fill
     ? "relative min-h-[12rem] w-full flex-1 overflow-hidden rounded-lg md:min-h-0"
@@ -603,11 +612,12 @@ export function BoardPreviewPanel({
           />
           {hasWallpaper ? (
             <div
-              className="pointer-events-none absolute inset-0 opacity-40"
+              className="pointer-events-none absolute inset-0"
               style={{
                 backgroundImage: `url(${wallpaper})`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
+                opacity: wallpaperAlpha,
               }}
               aria-hidden
             />

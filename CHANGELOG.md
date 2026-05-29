@@ -12,6 +12,16 @@ _Черновик до следующего релиза; в окне «О пр�
 
 <!-- changelog:user -->
 
+## [0.14.0] — 2026-05-28
+
+### Профиль (`/profile`)
+
+- **Безопасность:** **экспорт и импорт** настроек в JSON (профиль, блокнот, доска, история и избранное лобби); уточнён текст про локальное хранение и синхронизацию **имени** с аккаунтом.
+- **Оформление доски:** слайдер **прозрачности обоев** (0–100%) — одно значение в превью и в комнате; кнопка **«Сбросить оформление»**.
+- **Личные данные:** подсказки при неверном **Telegram** или **URL** сайта.
+- **Навигация:** **Alt+↑ / Alt+↓** между разделами настроек.
+- **Автосохранение:** предупреждение при переполнении `localStorage`; имя в комнате подтягивается с сервера при входе и сохраняется в аккаунт.
+
 ## [0.13.0] — 2026-05-28
 
 ### Профиль (`/profile`)
@@ -233,6 +243,7 @@ _Черновик до следующего релиза; в окне «О пр�
 
 ### API и сервер (история по релизам)
 
+- **0.14.0:** только клиент — `profileBackup` (export/import JSON), `wallpaperOpacity` + сброс оформления, `profileIdentityValidation`, синхронизация имени с API, `SaveProfileResult` / quota UI, Alt+навигация; `useProfilePrefsSync` + emojiStatus в prefs.
 - **0.13.0:** только клиент — сворачивание чек-листа заполнения профиля (`retrogen_profile_progress_collapsed_v1`); порог подсказки контраста фона/шапки по Δ яркости; сдвиг линейки блокнота.
 - **0.12.0:** только клиент — редизайн `pages/profile/*` (sidebar + detail, панели секций, `profileOverviewUi`, `profileLobbyUi`, `profileNotepadUi`, `profileSecurityUi`, пресеты комнаты); миграция местоимений en→ru в `profilePrefs`; обрезка горизонтального overflow (`profile-no-scroll-x`).
 - **0.11.0 / мессенджер:** Prisma `Chat`, `ChatMember`, `Message`, `MessageAttachment`, `MessageHidden`; модуль `server/src/chat/`; REST `/api/chats`, вложения `/api/chat/attachments/:id`, группа (`PATCH …/group/avatar`, `POST …/group/members`, `POST …/leave`, `DELETE …/:chatId`); Socket.IO `chat:join`, `chat:message.created|updated|hidden`, `chat:list.updated`, `chat:typing`. Файлы вложений — `server/data/chat-attachments/` (в `.gitignore`). Миграции `20260525180000_messenger`, `20260525200000_message_hidden`; после pull — `npm run db:deploy`.

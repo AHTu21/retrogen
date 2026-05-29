@@ -1,7 +1,6 @@
 import { useCallback, useState, type DragEvent, type ReactNode } from "react";
 import type { ProfileAccentPreset } from "../../lib/profileAccent";
-import type { CursorStyle, UserProfilePrefs } from "../../lib/profilePrefs";
-import { cursorCss, effectiveBoardWallpaper } from "../../lib/profilePrefs";
+import { DEFAULT_WALLPAPER_OPACITY, cursorCss, effectiveBoardWallpaper, type CursorStyle, type UserProfilePrefs } from "../../lib/profilePrefs";
 import {
   normalizeBoardBackdropColor,
   normalizeHeaderTintColor,
@@ -92,7 +91,10 @@ export function RoomLivePreview({
   prefs,
 }: {
   d: ProfileDesign;
-  prefs: Pick<UserProfilePrefs, "boardBackdrop" | "headerTint" | "cursorStyle" | "wallpaperDataUrl" | "avatarDataUrl">;
+  prefs: Pick<
+    UserProfilePrefs,
+    "boardBackdrop" | "headerTint" | "cursorStyle" | "wallpaperDataUrl" | "avatarDataUrl" | "wallpaperOpacity"
+  >;
 }) {
   const hasWallpaper = !!effectiveBoardWallpaper(prefs);
   const contrastHint = roomPaletteContrastHint(prefs.boardBackdrop, prefs.headerTint);
@@ -138,6 +140,7 @@ export function RoomLivePreview({
           cursorStyle={prefs.cursorStyle}
           wallpaperDataUrl={prefs.wallpaperDataUrl}
           avatarDataUrl={prefs.avatarDataUrl}
+          wallpaperOpacity={prefs.wallpaperOpacity}
         />
         {contrastHint ? (
           <p className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-[0.75rem] leading-relaxed text-amber-900 ring-1 ring-amber-500/20 dark:text-amber-100">
@@ -146,7 +149,7 @@ export function RoomLivePreview({
         ) : (
           <p className={`mt-3 text-[0.75rem] leading-relaxed ${d.muted}`}>
             {hasWallpaper
-              ? "Изображение накладывается на фон с прозрачностью 40% — колонки остаются читаемыми."
+              ? `Изображение накладывается на фон (${prefs.wallpaperOpacity}% непрозрачности) — колонки остаются читаемыми.`
               : "Добавьте обои ниже или выберите готовую тему для быстрого старта."}
           </p>
         )}
@@ -266,6 +269,66 @@ export function RoomCursorPicker({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+export function RoomWallpaperOpacity({
+  d,
+  value,
+  hasWallpaper,
+  onChange,
+}: {
+  d: ProfileDesign;
+  value: number;
+  hasWallpaper: boolean;
+  onChange: (opacity: number) => void;
+}) {
+  return (
+    <div className={`space-y-2 ${!hasWallpaper ? "opacity-50" : ""}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[0.8125rem] font-medium text-[var(--ph-text)]">Прозрачность обоев</span>
+        <span className={`font-mono text-[0.75rem] tabular-nums ${d.muted}`}>{value}%</span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={5}
+        disabled={!hasWallpaper}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="h-2 w-full cursor-pointer accent-[var(--ph-accent)] disabled:cursor-not-allowed"
+        aria-label="Прозрачность обоев на доске"
+      />
+      <p className={`text-[0.6875rem] leading-relaxed ${d.muted}`}>
+        {hasWallpaper
+          ? "Так же отображается в комнате и в живом превью выше."
+          : `Загрузите обои — по умолчанию ${DEFAULT_WALLPAPER_OPACITY}%.`}
+      </p>
+    </div>
+  );
+}
+
+export function RoomStyleResetBar({
+  d,
+  onReset,
+}: {
+  d: ProfileDesign;
+  onReset: () => void;
+}) {
+  return (
+    <div className={`flex flex-wrap items-center justify-between gap-3 ${d.rSm} bg-[var(--ph-surface-elevated)] px-4 py-3 ring-1 ring-[var(--ph-border)]`}>
+      <p className={`text-[0.8125rem] ${d.muted}`}>Вернуть фон, шапку, курсор и обои к значениям по умолчанию</p>
+      <button
+        type="button"
+        className={d.btnSecondary}
+        onClick={() => {
+          if (window.confirm("Сбросить оформление доски? Обои будут удалены.")) onReset();
+        }}
+      >
+        Сбросить оформление
+      </button>
     </div>
   );
 }

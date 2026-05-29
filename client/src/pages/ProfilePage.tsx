@@ -5,7 +5,8 @@ import { RetrogenDockableHelpRoot, RetrogenDockableHelpToggle } from "../compone
 import { RetrogenOverflowMenu } from "../components/RetrogenOverflowMenu";
 import { MessengerNavIconButton } from "../components/MessengerNavIconButton";
 import { ThemeCornersIconButtons } from "../components/ThemeCornersIconButtons";
-import { fetchAuthMe, logoutAccount, type AuthUserDto } from "../api";
+import { fetchAuthMe, logoutAccount, updateAuthDisplayName, type AuthUserDto } from "../api";
+import { applyProfileBackup, downloadProfileBackup, parseProfileBackup } from "../lib/profileBackup";
 import { profileAccentCssVars } from "../lib/profileAccent";
 import {
   loadProfilePrefs,
@@ -44,6 +45,9 @@ export function ProfilePage() {
   );
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(loadProfilePrefs()));
   const [savedHint, setSavedHint] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const authSeededRef = useRef(false);
+  const nameSyncRef = useRef<string | null>(null);
   const [authUser, setAuthUser] = useState<AuthUserDto | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
 
@@ -60,6 +64,14 @@ export function ProfilePage() {
   useEffect(() => {
     void fetchAuthMe().then(setAuthUser);
   }, []);
+
+  useEffect(() => {
+    if (!authUser || authSeededRef.current) return;
+    authSeededRef.current = true;
+    const serverName = authUser.displayName?.trim();
+    if (!serverName) return;
+    setPrefs((p) => (p.displayName.trim() ? p : { ...p, displayName: serverName }));
+  }, [authUser]);
 
   useEffect(() => {
     const onHash = () => setSection(parseProfileHash());
@@ -90,18 +102,106 @@ export function ProfilePage() {
     [authUser],
   );
 
-  const commit = useCallback((next: UserProfilePrefs) => {
-    const safe = saveProfilePrefs(next);
-    setPrefs(safe);
-    setSavedSnapshot(JSON.stringify(safe));
-    try {
-      window.dispatchEvent(new CustomEvent("retrogen-profile"));
-    } catch {
-      /* ignore */
-    }
-    setSavedHint("Сохранено");
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target;
+      if (
+        t instanceof HTMLInputElement ||
+        t instanceof HTMLTextAreaElement ||
+        t instanceof HTMLSelectElement ||
+        (t instanceof HTMLElement && t.isContentEditable)
+      ) {
+        return;
+      }
+      if (!e.altKey) return;
+      const idx = navItems.findIndex((n) => n.id === section);
+      if (idx < 0) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const next = navItems[(idx + 1) % navItems.length];
+        if (next) goSection(next.id);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const next = navItems[(idx - 1 + navItems.length) % navItems.length];
+        if (next) goSection(next.id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [section, navItems, goSection]);
+
+  const commit = useCallback(
+    (next: UserProfilePrefs) => {
+      const { prefs: safe, error } = saveProfilePrefs(next);
+      setPrefs(safe);
+      setSavedSnapshot(JSON.stringify(safe));
+      try {
+        window.dispatchEvent(new CustomEvent("retrogen-profile"));
+      } catch {
+        /* ignore */
+      }
+      if (error === "quota") {
+        setSaveError("Недостаточно места в браузере — уменьшите обои или аватар.");
+        setSavedHint(null);
+        return;
+      }
+      setSaveError(null);
+      setSavedHint("Сохранено");
+      window.setTimeout(() => setSavedHint(null), 2000);
+
+      const trimmed = safe.displayName.trim();
+      if (authUser && trimmed && trimmed !== authUser.displayName && nameSyncRef.current !== trimmed) {
+        nameSyncRef.current = trimmed;
+        void updateAuthDisplayName(trimmed)
+          .then((user) => {
+            setAuthUser(user);
+            nameSyncRef.current = null;
+          })
+          .catch(() => {
+            nameSyncRef.current = null;
+          });
+      }
+    },
+    [authUser],
+  );
+
+  const onExportBackup = useCallback(() => {
+    downloadProfileBackup();
+    setSavedHint("Файл скачан");
     window.setTimeout(() => setSavedHint(null), 2000);
   }, []);
+
+  const onImportBackup = useCallback(
+    (file: File | undefined) => {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = parseProfileBackup(JSON.parse(String(reader.result)));
+          if (!parsed) {
+            window.alert("Неверный формат файла Retrogen.");
+            return;
+          }
+          if (
+            !window.confirm(
+              "Импорт заменит настройки профиля в этом браузере (и историю лобби, если есть в файле). Продолжить?",
+            )
+          ) {
+            return;
+          }
+          const safe = applyProfileBackup(parsed);
+          setPrefs(safe);
+          commit(safe);
+          setSavedHint("Импортировано");
+          window.setTimeout(() => setSavedHint(null), 2000);
+        } catch {
+          window.alert("Не удалось прочитать файл.");
+        }
+      };
+      reader.readAsText(file);
+    },
+    [commit],
+  );
 
   const autosaveReady = useRef(false);
   useEffect(() => {
@@ -154,7 +254,10 @@ export function ProfilePage() {
         Центр настроек в стиле System Settings: слева профиль и разделы, справа — формы. Изменения сохраняются в браузере
         автоматически.
       </p>
-      <p className="mt-3 opacity-90">После входа настройки можно будет синхронизировать с аккаунтом (PLAN §12).</p>
+      <p className="mt-3 opacity-90">
+        Автосохранение в браузере. Имя при входе подставляется из аккаунта; экспорт JSON — в «Безопасность». Навигация: Alt+↑/↓
+        по разделам.
+      </p>
     </>
   );
 
@@ -230,6 +333,12 @@ export function ProfilePage() {
             </p>
           ) : null}
 
+          {saveError ? (
+            <p className={`mb-4 px-4 py-3 text-[0.875rem] ${d.noticeBanner} ${d.rSm} border-amber-500/30 text-amber-900 dark:text-amber-100`}>
+              {saveError}
+            </p>
+          ) : null}
+
           <div className={d.window}>
             <ProfileSidebar
               d={d}
@@ -261,6 +370,8 @@ export function ProfilePage() {
                     setAuthUser(null);
                     navigate("/", { replace: true });
                   }}
+                  onExportBackup={onExportBackup}
+                  onImportBackup={onImportBackup}
                 />
               </div>
             </main>

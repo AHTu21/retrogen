@@ -46,7 +46,7 @@ export function SecurityHero({ d, authUser }: { d: ProfileDesign; authUser: Auth
           </h2>
           <p className={`mt-2 text-[0.8125rem] leading-relaxed ${d.muted}`}>
             {signedIn
-              ? "Управляйте входом и сессией. Настройки профиля на этом устройстве синхронизируются с аккаунтом при входе."
+              ? "Управляйте входом и сессией. Имя в комнате сохраняется в аккаунт; остальные настройки — в этом браузере до облачной синхронизации."
               : "Войдите, чтобы привязать профиль к email и открыть корпоративные функции защиты."}
           </p>
         </div>
@@ -163,6 +163,50 @@ const SECURITY_FEATURES: SecurityFeature[] = [
     status: "soon",
   },
 ];
+
+export function SecurityDataPortability({
+  d,
+  onExport,
+  onImport,
+}: {
+  d: ProfileDesign;
+  onExport: () => void;
+  onImport: (file: File | undefined) => void;
+}) {
+  return (
+    <section className="space-y-2">
+      <div className="px-0.5">
+        <h2 className={d.groupTitle}>Резервная копия настроек</h2>
+        <p className={d.groupDesc}>
+          Экспорт и импорт JSON — профиль, блокнот, оформление доски, история лобби в этом браузере
+        </p>
+      </div>
+      <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${d.insetGroup} p-4 sm:p-5`}>
+        <p className={`max-w-md text-[0.8125rem] leading-relaxed ${d.muted}`}>
+          Скачайте файл перед сменой устройства или для внутреннего регламента. Импорт полностью заменяет локальные
+          настройки.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={d.btnPrimary} onClick={onExport}>
+            Скачать .json
+          </button>
+          <label className={`cursor-pointer ${d.btnSecondary}`}>
+            <input
+              type="file"
+              accept="application/json,.json"
+              className="sr-only"
+              onChange={(e) => {
+                onImport(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            Импортировать
+          </label>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export function SecurityFeaturesGrid({ d, authUser }: { d: ProfileDesign; authUser: AuthUserDto | null }) {
   const features = authUser
