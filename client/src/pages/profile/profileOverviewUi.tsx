@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { AuthUserDto } from "../../api";
 import type { UserProfilePrefs } from "../../lib/profilePrefs";
@@ -257,6 +257,24 @@ export function OverviewHub({
   );
 }
 
+const PROFILE_PROGRESS_COLLAPSED_KEY = "retrogen_profile_progress_collapsed_v1";
+
+function readProfileProgressCollapsed(): boolean {
+  try {
+    return localStorage.getItem(PROFILE_PROGRESS_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeProfileProgressCollapsed(collapsed: boolean) {
+  try {
+    localStorage.setItem(PROFILE_PROGRESS_COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
 export function OverviewProfileProgress({
   d,
   tasks,
@@ -268,17 +286,61 @@ export function OverviewProfileProgress({
 }) {
   const done = tasks.filter((t) => t.done).length;
   const pct = Math.round((done / tasks.length) * 100);
+  const [collapsed, setCollapsed] = useState(readProfileProgressCollapsed);
+
+  useEffect(() => {
+    if (pct === 100) {
+      setCollapsed(true);
+      writeProfileProgressCollapsed(true);
+    }
+  }, [pct]);
+
+  const collapse = () => {
+    setCollapsed(true);
+    writeProfileProgressCollapsed(true);
+  };
+
+  const expand = () => {
+    setCollapsed(false);
+    writeProfileProgressCollapsed(false);
+  };
+
+  if (collapsed && pct === 100) {
+    return null;
+  }
+
+  if (collapsed) {
+    return (
+      <section className="px-0.5">
+        <button
+          type="button"
+          onClick={expand}
+          className={`flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left ring-1 ring-[var(--ph-border)] transition hover:bg-[var(--ph-nav-hover)] ${d.rSm} bg-[var(--ph-surface)]`}
+        >
+          <span className="text-[0.8125rem] font-medium text-[var(--ph-text)]">Заполнение профиля</span>
+          <span className={`shrink-0 text-[0.75rem] font-medium tabular-nums ${d.link}`}>{pct}% · показать</span>
+        </button>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-2">
       <div className="flex flex-wrap items-end justify-between gap-2 px-0.5">
-        <div>
+        <div className="min-w-0 flex-1">
           <h2 className={d.groupTitle}>Заполнение профиля</h2>
           <p className={d.groupDesc}>Подсказки — что улучшить до следующего ретро</p>
         </div>
-        <span className={`text-[0.8125rem] font-semibold tabular-nums ${pct === 100 ? "text-emerald-600 dark:text-emerald-400" : d.muted}`}>
-          {pct}%
-        </span>
+        <div className="flex shrink-0 items-center gap-3">
+          <span
+            className={`text-[0.8125rem] font-semibold tabular-nums ${pct === 100 ? "text-emerald-600 dark:text-emerald-400" : d.muted}`}
+          >
+            {pct}%
+          </span>
+          <button type="button" className={`text-[0.75rem] font-medium ${d.link}`} onClick={collapse}>
+            Скрыть
+          </button>
+        </div>
       </div>
       <div className={`${d.insetGroup} overflow-hidden`}>
         <div className="h-1.5 bg-[var(--ph-surface-elevated)]">
