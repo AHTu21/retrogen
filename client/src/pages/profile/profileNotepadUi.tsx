@@ -237,12 +237,14 @@ export function NotepadWorkspace({
         <div className="bg-[var(--ph-notepad-bg)]">
           <textarea
             ref={textareaRef}
-            className="block min-h-[min(22rem,55vh)] w-full resize-y border-0 bg-transparent px-4 pb-4 pt-1 font-[inherit] text-[0.9375rem] leading-[1.5rem] text-[var(--ph-text)] outline-none placeholder:text-[var(--ph-muted)] placeholder:opacity-80"
+            className="block min-h-[min(22rem,55vh)] w-full resize-y border-0 bg-transparent px-4 pb-4 pt-1 font-[inherit] text-[0.9375rem] text-[var(--ph-text)] outline-none placeholder:text-[var(--ph-muted)] placeholder:opacity-80"
             style={{
               lineHeight,
               backgroundImage: notepadLinedBackground(),
               backgroundAttachment: "local",
               backgroundSize: `100% ${lineHeight}`,
+              /* линии на 2px ниже — descenders ([ ]) не наезжают на разметку */
+              backgroundPosition: "0 2px",
             }}
             value={value}
             placeholder={NOTEPAD_PLACEHOLDER}
