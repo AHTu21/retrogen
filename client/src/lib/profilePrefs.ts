@@ -3,7 +3,44 @@ import {
   LEGACY_PROFILE_ACCENT,
   normalizeProfileAccent,
 } from "./profileAccent";
-import { normalizeBoardBackdropColor, normalizeHeaderTintColor } from "./profileRoomColors";
+import {
+  DEFAULT_BOARD_BACKDROP,
+  DEFAULT_HEADER_TINT,
+  normalizeBoardBackdropColor,
+  normalizeHeaderTintColor,
+} from "./profileRoomColors";
+
+/** Прозрачность обоев на доске (0–100), по умолчанию как в превью профиля */
+export const DEFAULT_WALLPAPER_OPACITY = 40;
+
+export function normalizeWallpaperOpacity(raw: unknown): number {
+  const n = typeof raw === "number" ? raw : Number.parseInt(String(raw ?? ""), 10);
+  if (!Number.isFinite(n)) return DEFAULT_WALLPAPER_OPACITY;
+  return Math.min(100, Math.max(0, Math.round(n)));
+}
+
+export function wallpaperOpacityFraction(opacity: number): number {
+  return normalizeWallpaperOpacity(opacity) / 100;
+}
+
+export type SaveProfileResult = {
+  prefs: UserProfilePrefs;
+  error?: "quota";
+};
+
+/** Сброс только оформления комнаты к заводским значениям */
+export function defaultRoomStylePrefs(): Pick<
+  UserProfilePrefs,
+  "boardBackdrop" | "headerTint" | "cursorStyle" | "wallpaperDataUrl" | "wallpaperOpacity"
+> {
+  return {
+    boardBackdrop: DEFAULT_BOARD_BACKDROP,
+    headerTint: DEFAULT_HEADER_TINT,
+    cursorStyle: "default",
+    wallpaperDataUrl: null,
+    wallpaperOpacity: DEFAULT_WALLPAPER_OPACITY,
+  };
+}
 
 const KEY = "retrogen_profile_v1";
 /** Макс. длина data URL обоев для localStorage */
@@ -49,6 +86,8 @@ export type UserProfilePrefs = {
   avatarDataUrl: string | null;
   /** Обои поверх фона комнаты /r/… */
   wallpaperDataUrl: string | null;
+  /** 0–100: прозрачность слоя обоев на доске */
+  wallpaperOpacity: number;
   /** Эмодзи-статус в мессенджере и профиле */
   emojiStatus: string;
 };
@@ -75,6 +114,7 @@ const defaultPrefs: UserProfilePrefs = {
   profileAccent: DEFAULT_PROFILE_ACCENT,
   avatarDataUrl: null,
   wallpaperDataUrl: null,
+  wallpaperOpacity: DEFAULT_WALLPAPER_OPACITY,
   emojiStatus: "",
 };
 
@@ -121,8 +161,10 @@ function sanitizeProfilePrefs(p: UserProfilePrefs): UserProfilePrefs {
   boardBackdrop = effectiveBoardBackdrop(boardBackdrop, avatarDataUrl);
   boardBackdrop = normalizeBoardBackdropColor(boardBackdrop);
   const headerTint = normalizeHeaderTintColor(p.headerTint);
+  const wallpaperOpacity = normalizeWallpaperOpacity(p.wallpaperOpacity);
+  const emojiStatus = typeof p.emojiStatus === "string" ? p.emojiStatus.trim().slice(0, 8) : "";
 
-  return { ...p, avatarDataUrl, wallpaperDataUrl, boardBackdrop, headerTint };
+  return { ...p, avatarDataUrl, wallpaperDataUrl, boardBackdrop, headerTint, wallpaperOpacity, emojiStatus };
 }
 
 export function loadProfilePrefs(): UserProfilePrefs {
@@ -167,6 +209,7 @@ export function loadProfilePrefs(): UserProfilePrefs {
       })(),
       avatarDataUrl: typeof p.avatarDataUrl === "string" ? p.avatarDataUrl : null,
       wallpaperDataUrl: typeof p.wallpaperDataUrl === "string" ? p.wallpaperDataUrl : null,
+      wallpaperOpacity: normalizeWallpaperOpacity(p.wallpaperOpacity),
       emojiStatus: typeof p.emojiStatus === "string" ? p.emojiStatus.trim().slice(0, 8) : "",
     };
     const sanitized = sanitizeProfilePrefs(loaded);
@@ -184,7 +227,7 @@ function capDataUrl(url: string | null) {
 }
 
 /** Нормализует и пишет в localStorage; возвращает итоговые prefs для state. */
-export function saveProfilePrefs(p: UserProfilePrefs): UserProfilePrefs {
+export function saveProfilePrefs(p: UserProfilePrefs): SaveProfileResult {
   const safe = sanitizeProfilePrefs({
     ...p,
     avatarDataUrl: capDataUrl(p.avatarDataUrl),
@@ -192,10 +235,10 @@ export function saveProfilePrefs(p: UserProfilePrefs): UserProfilePrefs {
   });
   try {
     localStorage.setItem(KEY, JSON.stringify(safe));
+    return { prefs: safe };
   } catch {
-    /* ignore quota */
+    return { prefs: safe, error: "quota" };
   }
-  return safe;
 }
 
 export function cursorCss(v: CursorStyle): string {

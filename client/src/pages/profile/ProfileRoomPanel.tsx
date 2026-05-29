@@ -1,5 +1,5 @@
 import type { UserProfilePrefs } from "../../lib/profilePrefs";
-import { effectiveBoardWallpaper } from "../../lib/profilePrefs";
+import { defaultRoomStylePrefs, effectiveBoardWallpaper } from "../../lib/profilePrefs";
 import { normalizeProfileAccent, PROFILE_ACCENT_PRESETS } from "../../lib/profileAccent";
 import {
   BOARD_BACKDROP_PRESETS,
@@ -15,6 +15,8 @@ import {
   RoomLivePreview,
   RoomPaletteSection,
   RoomQuickThemes,
+  RoomStyleResetBar,
+  RoomWallpaperOpacity,
   RoomWallpaperStudio,
   SettingColorGroup,
 } from "./profileRoomUi";
@@ -39,8 +41,13 @@ export function ProfileRoomPanel({ d, prefs, setPrefs, onWallpaperFile, onWallpa
     }));
   };
 
+  const resetRoomStyle = () => {
+    setPrefs((p) => ({ ...p, ...defaultRoomStylePrefs() }));
+  };
+
   return (
     <div className="flex min-w-0 max-w-full flex-col gap-8 overflow-x-clip">
+      <RoomStyleResetBar d={d} onReset={resetRoomStyle} />
       <RoomLivePreview d={d} prefs={prefs} />
 
       <RoomQuickThemes
@@ -94,13 +101,21 @@ export function ProfileRoomPanel({ d, prefs, setPrefs, onWallpaperFile, onWallpa
         </ProfileField>
         <div className={`border-t ${d.insetRow}`}>
           <ProfileField d={d} label="Обои" hint="Опционально — поверх цвета фона" stacked>
-            <RoomWallpaperStudio
-              d={d}
-              wallpaperDataUrl={prefs.wallpaperDataUrl}
-              hasFile={hasWallpaper}
-              onPick={onWallpaperFile}
-              onClear={onWallpaperClear}
-            />
+            <div className="space-y-4">
+              <RoomWallpaperStudio
+                d={d}
+                wallpaperDataUrl={prefs.wallpaperDataUrl}
+                hasFile={hasWallpaper}
+                onPick={onWallpaperFile}
+                onClear={onWallpaperClear}
+              />
+              <RoomWallpaperOpacity
+                d={d}
+                value={prefs.wallpaperOpacity}
+                hasWallpaper={hasWallpaper}
+                onChange={(wallpaperOpacity) => setPrefs({ ...prefs, wallpaperOpacity })}
+              />
+            </div>
           </ProfileField>
         </div>
       </ProfileCard>

@@ -24,6 +24,8 @@ export type ProfilePanelsProps = {
   onWallpaperFile: (f: File | undefined) => void;
   onLogout: () => void;
   onGoSection: (id: ProfileSectionId) => void;
+  onExportBackup: () => void;
+  onImportBackup: (file: File | undefined) => void;
 };
 
 export function ProfileSectionPanels({
@@ -38,6 +40,8 @@ export function ProfileSectionPanels({
   onWallpaperFile,
   onLogout,
   onGoSection,
+  onExportBackup,
+  onImportBackup,
 }: ProfilePanelsProps) {
   if (section === "overview") {
     return (
@@ -82,7 +86,15 @@ export function ProfileSectionPanels({
   }
 
   if (section === "security") {
-    return <ProfileSecurityPanel d={d} authUser={authUser} onLogout={onLogout} />;
+    return (
+      <ProfileSecurityPanel
+        d={d}
+        authUser={authUser}
+        onLogout={onLogout}
+        onExportBackup={onExportBackup}
+        onImportBackup={onImportBackup}
+      />
+    );
   }
 
   if (section === "danger") {

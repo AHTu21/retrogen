@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import type { AuthUserDto } from "../../../api";
+import { validateTelegram, validateWebsite } from "../../../lib/profileIdentityValidation";
 import type { UserProfilePrefs } from "../../../lib/profilePrefs";
 import type { ProfileDesign } from "../profileDesign";
 import {
@@ -85,8 +87,15 @@ function timezoneLabel(value: string) {
   return PROFILE_TIMEZONE_PRESETS.find((z) => z.value === value)?.label.split(" (")[0] ?? value;
 }
 
+function FieldError({ message }: { message: string | null }) {
+  if (!message) return null;
+  return <p className="mt-1 text-[0.75rem] text-amber-700 dark:text-amber-300">{message}</p>;
+}
+
 export function ProfileIdentityPanel({ d, prefs, setPrefs, authUser }: Props) {
   const roleListId = "profile-role-suggestions";
+  const telegramError = useMemo(() => validateTelegram(prefs.telegram), [prefs.telegram]);
+  const websiteError = useMemo(() => validateWebsite(prefs.website), [prefs.website]);
 
   return (
     <ProfileSectionFrame d={d} sectionId="identity">
@@ -188,8 +197,10 @@ export function ProfileIdentityPanel({ d, prefs, setPrefs, authUser }: Props) {
             placeholder="username"
             maxLength={32}
             autoComplete="off"
+            aria-invalid={!!telegramError}
             onChange={(e) => setPrefs({ ...prefs, telegram: normalizeTelegram(e.target.value) })}
           />
+          <FieldError message={telegramError} />
         </ProfileField>
         <ProfileField d={d} label="Сайт или LinkedIn" divided>
           <input
@@ -198,9 +209,11 @@ export function ProfileIdentityPanel({ d, prefs, setPrefs, authUser }: Props) {
             value={prefs.website}
             placeholder="https://example.com"
             maxLength={200}
+            aria-invalid={!!websiteError}
             onChange={(e) => setPrefs({ ...prefs, website: e.target.value })}
             onBlur={(e) => setPrefs({ ...prefs, website: normalizeWebsite(e.target.value) })}
           />
+          <FieldError message={websiteError} />
         </ProfileField>
         <ProfileField d={d} label="Телефон" hint="Или другой способ связи" divided>
           <input

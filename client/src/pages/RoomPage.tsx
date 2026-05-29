@@ -35,6 +35,7 @@ import {
   cursorCss,
   effectiveBoardBackdrop,
   effectiveBoardWallpaper,
+  wallpaperOpacityFraction,
   loadProfilePrefs,
   type UserProfilePrefs,
 } from "../lib/profilePrefs";
@@ -4161,7 +4162,10 @@ export function RoomPage() {
       {effectiveBoardWallpaper(profileFx) ? (
         <div
           className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(${effectiveBoardWallpaper(profileFx)})` }}
+          style={{
+            backgroundImage: `url(${effectiveBoardWallpaper(profileFx)})`,
+            opacity: wallpaperOpacityFraction(profileFx.wallpaperOpacity),
+          }}
           aria-hidden
         />
       ) : null}
