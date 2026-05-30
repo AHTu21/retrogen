@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { loginAccount } from "../api";
+import { safeAuthReturnTo } from "../lib/authErrors";
 import { RetrogenDockableAbout } from "../components/RetrogenDockableAbout";
 import { RetrogenDockableHelpRoot, RetrogenDockableHelpToggle } from "../components/RetrogenDockableHelp";
 import { RetrogenOverflowMenu } from "../components/RetrogenOverflowMenu";
@@ -10,6 +11,11 @@ import { useAppCorners, useAppTheme } from "../theme";
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const returnTo = safeAuthReturnTo(
+    searchParams.get("returnTo") ?? (location.state as { returnTo?: string } | null)?.returnTo,
+  );
   const { themeMode, toggleTheme } = useAppTheme();
   const { cornerMode, toggleCorners } = useAppCorners();
   const isLight = themeMode === "light";
@@ -26,7 +32,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       await loginAccount({ email: email.trim(), password });
-      navigate("/home", { replace: true });
+      navigate(returnTo, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка входа");
     } finally {

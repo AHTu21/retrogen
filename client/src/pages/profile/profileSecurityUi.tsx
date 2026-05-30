@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { AuthUserDto } from "../../api";
+import { useGoProfileLogin } from "../../lib/profileLoginNav";
 import type { CloudProfileMeta } from "../../lib/profileCloudPayload";
 import type { CloudSyncState } from "../../lib/profileCloudSync";
 import type { ProfileDesign } from "./profileDesign";
@@ -74,6 +75,8 @@ export function SecuritySessionCard({
   authUser: AuthUserDto | null;
   onLogout: () => void;
 }) {
+  const goLogin = useGoProfileLogin();
+
   if (!authUser) {
     return (
       <div className={`${d.insetGroup} p-4 sm:p-5`}>
@@ -84,9 +87,9 @@ export function SecuritySessionCard({
               Локальные настройки профиля сохраняются только в этом браузере.
             </p>
           </div>
-          <Link to="/login" className={`${d.btnPrimary} w-full justify-center sm:w-auto`}>
+          <button type="button" className={`${d.btnPrimary} w-full justify-center sm:w-auto`} onClick={goLogin}>
             Войти
-          </Link>
+          </button>
         </div>
       </div>
     );
