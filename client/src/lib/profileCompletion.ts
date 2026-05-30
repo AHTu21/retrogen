@@ -1,7 +1,8 @@
 import type { AuthUserDto } from "../api";
 import type { UserProfilePrefs } from "./profilePrefs";
 import { effectiveBoardWallpaper } from "./profilePrefs";
-import type { ProfileSectionId } from "../pages/profile/profileHubTheme";
+import { resolveProfileNotificationEmail } from "./profileNotificationPrefs";
+import type { ProfileSectionId } from "./profileSections";
 
 export type ProfileCompletionTask = {
   id: string;
@@ -17,6 +18,10 @@ export function buildProfileCompletionTasks(
   const hasName = !!(prefs.displayName.trim() || authUser?.displayName?.trim());
   const hasBoardStyle = !!(prefs.boardBackdrop.trim() || effectiveBoardWallpaper(prefs));
   const shownEmail = prefs.profileEmail.trim() || authUser?.email?.trim() || "";
+  const notifyEmail = resolveProfileNotificationEmail(prefs.profileEmail, authUser?.email);
+  const notifyConfigured =
+    !!notifyEmail &&
+    (prefs.notifications.retroEnded || prefs.notifications.weeklyDigest || prefs.notifications.productUpdates);
 
   return [
     { id: "name", label: "Имя для комнаты", done: hasName, section: "identity" },
@@ -25,6 +30,7 @@ export function buildProfileCompletionTasks(
     { id: "role", label: "Роль или команда", done: !!(prefs.roleTitle.trim() || prefs.teamName.trim()), section: "identity" },
     { id: "contact", label: "Email или контакт", done: !!shownEmail, section: "identity" },
     { id: "status", label: "Эмодзи-статус", done: !!prefs.emojiStatus.trim(), section: "identity" },
+    { id: "notify", label: "Email-уведомления", done: notifyConfigured, section: "notifications" },
     { id: "room", label: "Оформление доски", done: hasBoardStyle, section: "room" },
     { id: "notepad", label: "Заметки в блокноте", done: !!prefs.notepad.trim(), section: "notepad" },
   ];

@@ -179,6 +179,19 @@ export function buildOverviewHubItems(
       icon: profileNavIcon("notifications"),
       section: "notifications",
     },
+    ...(authUser
+      ? [
+          {
+            id: "organization",
+            label: "Организация",
+            value: "Preview",
+            metric: "Team+ и SSO",
+            action: "Корпоративные возможности",
+            icon: profileNavIcon("organization"),
+            section: "organization" as ProfileSectionId,
+          },
+        ]
+      : []),
     {
       id: "workshop",
       label: "Мастерская",

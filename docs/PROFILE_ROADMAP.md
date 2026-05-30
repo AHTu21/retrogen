@@ -80,7 +80,7 @@ components/room/           — UI комнаты, связанный с проф
 | Секция | Статус |
 |--------|--------|
 | `#notifications` | **MVP** — toggles в sidebar, prefs в `profilePrefs.notifications` |
-| `#organization`, `#billing` | Roadmap-панель (locked) |
+| `#organization`, `#billing` | **Preview** — UI-панели (roadmap-функции, тарифы); backend Team+ позже |
 
 ### Фаза E — Cloud sync (бэклог)
 

@@ -1,14 +1,7 @@
-export type ProfileSectionId =
-  | "overview"
-  | "identity"
-  | "room"
-  | "lobby"
-  | "notepad"
-  | "notifications"
-  | "organization"
-  | "billing"
-  | "security"
-  | "danger";
+import { DEFAULT_PROFILE_SECTION, type ProfileSectionId } from "../../lib/profileSections";
+
+export type { ProfileSectionId };
+export { DEFAULT_PROFILE_SECTION };
 
 export type ProfileNavItem = {
   id: ProfileSectionId;
@@ -17,8 +10,8 @@ export type ProfileNavItem = {
   locked?: boolean;
   lockReason?: string;
   guestHidden?: boolean;
-  /** Скрыто из sidebar до релиза функции */
   navHidden?: boolean;
+  navBadge?: string;
 };
 
 export const PROFILE_NAV: ProfileNavItem[] = [
@@ -35,36 +28,32 @@ export const PROFILE_NAV: ProfileNavItem[] = [
   {
     id: "organization",
     label: "Организация",
-    locked: true,
-    navHidden: true,
+    hint: "Team+, SSO и white-label — предпросмотр корпоративных возможностей",
     guestHidden: true,
-    lockReason: "Team+ и white-label (ВТБ, МТС)",
+    navBadge: "Preview",
   },
   {
     id: "billing",
     label: "Тариф",
-    locked: true,
-    navHidden: true,
+    hint: "Сравнение планов Free / Team / Enterprise и модулей IAM · AI · ARCH",
     guestHidden: true,
-    lockReason: "Модули IAM, AI, ARCH",
+    navBadge: "Preview",
   },
   { id: "security", label: "Безопасность", hint: "Сессия, защита аккаунта и конфиденциальность" },
   { id: "danger", label: "Опасная зона", hint: "Экспорт данных и удаление аккаунта", guestHidden: true },
 ];
 
-/** Только видимые в sidebar пункты */
 export const PROFILE_NAV_VISIBLE = PROFILE_NAV.filter((n) => !n.navHidden);
 
 export const PROFILE_NAV_GROUPS: { title: string; ids: ProfileSectionId[] }[] = [
   { title: "Профиль", ids: ["overview", "identity", "room", "lobby", "notepad"] },
+  { title: "Корпоратив", ids: ["organization", "billing"] },
   { title: "Система", ids: ["notifications", "security", "danger"] },
 ];
 
 const HASH_ALIASES: Record<string, ProfileSectionId> = {
   facilitator: "notepad",
 };
-
-export const DEFAULT_PROFILE_SECTION: ProfileSectionId = "overview";
 
 export function parseProfileHash(): ProfileSectionId {
   const raw = window.location.hash.replace(/^#/, "");

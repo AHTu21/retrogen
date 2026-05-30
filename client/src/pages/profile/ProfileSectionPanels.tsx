@@ -3,10 +3,10 @@ import type { UserProfilePrefs } from "../../lib/profilePrefs";
 import type { VisitedRoomEntry } from "../../lib/roomLobbyPrefs";
 import type { ProfileDesign } from "./profileDesign";
 import type { ProfileSectionId } from "./profileHubTheme";
-import { PROFILE_NAV } from "./profileHubTheme";
 import { ProfileRoomPanel } from "./ProfileRoomPanel";
 import { ProfileDangerPanel } from "./panels/ProfileDangerPanel";
-import { ProfileRoadmapPanel } from "./panels/ProfileRoadmapPanel";
+import { ProfileBillingPanel } from "./panels/ProfileBillingPanel";
+import { ProfileOrganizationPanel } from "./panels/ProfileOrganizationPanel";
 import { ProfileIdentityPanel } from "./panels/ProfileIdentityPanel";
 import { ProfileLobbyPanel } from "./panels/ProfileLobbyPanel";
 import { ProfileNotificationsPanel } from "./panels/ProfileNotificationsPanel";
@@ -118,9 +118,12 @@ export function ProfileSectionPanels({
     return <ProfileDangerPanel d={d} onGoSection={onGoSection} />;
   }
 
-  const roadmapMeta = PROFILE_NAV.find((n) => n.id === section && n.locked);
-  if (roadmapMeta) {
-    return <ProfileRoadmapPanel d={d} meta={roadmapMeta} />;
+  if (section === "organization") {
+    return <ProfileOrganizationPanel d={d} authUser={authUser} onGoSection={onGoSection} />;
+  }
+
+  if (section === "billing") {
+    return <ProfileBillingPanel d={d} onGoSection={onGoSection} />;
   }
 
   return null;

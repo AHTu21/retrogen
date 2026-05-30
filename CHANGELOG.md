@@ -8,23 +8,19 @@
 
 ## [Unreleased]
 
-### Профиль (`/profile`) + мессенджер
-
-### Профиль (`/profile`)
-
-- **Уведомления:** новый раздел в sidebar — email о завершении ретро, дайджест, новости; prefs в профиле, autosave; плитка на обзоре.
-- **Legacy cleanup:** удалены мёртвые `profileShell`/`hubClasses`; пол/день рождения убраны из UI мессенджера (данные остаются в JSON-бэкапе).
-- **`useProfilePrefsDraft`:** ProfilePage и мессенджер на едином hook (autosave / manual commit, `onAfterCommit` для sync имени с API).
-
-### Комната + профиль
-
-- **Identity bridge:** имя, emoji и аватар из `/profile` используются в комнате (стикеры, chip в шапке); `useProfilePrefsSync` вместо дублирования listeners.
-- **`lib/roomActorProfile.ts`** — единый resolver identity участника.
-- **`useProfilePrefsDraft`** — заготовка unified draft hook (Фаза B).
-
 _Черновик до следующего релиза; в окне «О программе» не показывается._
 
 <!-- changelog:user -->
+
+## [0.16.0] — 2026-05-28
+
+### Профиль (`/profile`)
+
+- **Уведомления:** раздел в sidebar — email о завершении ретро, дайджест и новости; prefs в профиле с autosave; плитка на обзоре; задача «Email-уведомления» в прогрессе профиля.
+- **Корпоратив (Preview):** разделы **Организация** и **Тариф** — hero, roadmap-функции (SSO, Team+, white-label), сравнение планов Free / Team / Enterprise; badge Preview в навигации.
+- **Identity bridge:** имя, emoji и аватар из `/profile` в комнате (стикеры, chip в шапке); `useProfilePrefsSync` вместо дублирования listeners; `lib/roomActorProfile.ts`.
+- **`useProfilePrefsDraft`:** единый hook autosave / manual commit для ProfilePage и мессенджера; `onAfterCommit` для sync имени с API.
+- **Legacy cleanup:** удалены мёртвые `profileShell`/`hubClasses`; пол/день рождения убраны из UI мессенджера (данные остаются в JSON-бэкапе).
 
 ## [0.15.0] — 2026-05-28
 
