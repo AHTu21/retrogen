@@ -1,14 +1,24 @@
 import { useMemo } from "react";
 import type { AuthUserDto } from "../../../api";
+import {
+  PROFILE_CONTACT_MAX,
+  PROFILE_DISPLAY_NAME_MAX,
+  PROFILE_PROFILE_EMAIL_MAX,
+  PROFILE_SIGNATURE_MAX,
+  PROFILE_TELEGRAM_MAX,
+  PROFILE_WEBSITE_MAX,
+  clampSignature,
+} from "../../../lib/profileFormFields";
 import { validateTelegram, validateWebsite } from "../../../lib/profileIdentityValidation";
 import type { UserProfilePrefs } from "../../../lib/profilePrefs";
+import { ProfileEmojiStatusField } from "../ProfileEmojiStatusField";
 import type { ProfileDesign } from "../profileDesign";
 import {
   PROFILE_PRONOUN_PRESETS,
   PROFILE_ROLE_SUGGESTIONS,
   PROFILE_TIMEZONE_PRESETS,
 } from "../profileIdentityOptions";
-import { displayHandle, initials } from "../profileUser";
+import { displayNameWithStatus, initials } from "../profileUser";
 import {
   ProfileCard,
   ProfileCharCount,
@@ -46,7 +56,6 @@ function IdentityPreview({
   prefs: UserProfilePrefs;
   authUser: AuthUserDto | null;
 }) {
-  const name = displayHandle(prefs, authUser);
   const roleLine = [prefs.roleTitle.trim(), prefs.teamName.trim()].filter(Boolean).join(" · ");
   const locationLine = [prefs.city.trim(), prefs.timezone.trim() ? timezoneLabel(prefs.timezone) : ""]
     .filter(Boolean)
@@ -66,7 +75,9 @@ function IdentityPreview({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[0.9375rem] font-semibold text-[var(--ph-text)]">{name}</p>
+          <p className="truncate text-[0.9375rem] font-semibold text-[var(--ph-text)]">
+            {displayNameWithStatus(prefs, authUser)}
+          </p>
           {prefs.pronouns.trim() ? <p className={`text-[0.75rem] ${d.muted}`}>{prefs.pronouns.trim()}</p> : null}
           {roleLine ? <p className={`mt-0.5 text-[0.8125rem] ${d.muted}`}>{roleLine}</p> : null}
           {prefs.signature.trim() ? (
@@ -100,8 +111,7 @@ export function ProfileIdentityPanel({ d, prefs, setPrefs, authUser }: Props) {
   return (
     <ProfileSectionFrame d={d} sectionId="identity">
       <p className={`text-[0.875rem] leading-relaxed ${d.muted}`}>
-        Заполните профиль так, как вас увидят участники ретро. Фото — в карточке слева. Email аккаунта меняется
-        только после входа.
+        Единая карточка для комнаты и мессенджера: имя, статус, контакты и «О себе». Фото — в карточке слева.
       </p>
 
       <IdentityPreview d={d} prefs={prefs} authUser={authUser} />
@@ -109,8 +119,34 @@ export function ProfileIdentityPanel({ d, prefs, setPrefs, authUser }: Props) {
       {authUser ? (
         <ProfileCard d={d} title="Аккаунт">
           <ProfileValueRow d={d} label="Email для входа" value={authUser.email} />
+          <ProfileField d={d} label="Email в карточке" hint="Как показывать в мессенджере; пусто — email входа" divided>
+            <input
+              className={d.field()}
+              type="email"
+              value={prefs.profileEmail}
+              placeholder={authUser.email}
+              maxLength={PROFILE_PROFILE_EMAIL_MAX}
+              autoComplete="email"
+              onChange={(e) =>
+                setPrefs({ ...prefs, profileEmail: e.target.value.slice(0, PROFILE_PROFILE_EMAIL_MAX) })
+              }
+              onBlur={(e) =>
+                setPrefs({ ...prefs, profileEmail: e.target.value.trim().slice(0, PROFILE_PROFILE_EMAIL_MAX) })
+              }
+            />
+          </ProfileField>
         </ProfileCard>
       ) : null}
+
+      <ProfileCard d={d} title="Статус" description="Эмодзи рядом с именем в мессенджере и списках участников.">
+        <ProfileField d={d} label="Эмодзи-статус">
+          <ProfileEmojiStatusField
+            d={d}
+            value={prefs.emojiStatus}
+            onChange={(emojiStatus) => setPrefs({ ...prefs, emojiStatus })}
+          />
+        </ProfileField>
+      </ProfileCard>
 
       <ProfileCard d={d} title="Имя и роль" description="Первая строка в списке участников и на стикерах.">
         <ProfileField d={d} label="Имя" hint="Как к вам обращаться в комнате">
@@ -118,7 +154,7 @@ export function ProfileIdentityPanel({ d, prefs, setPrefs, authUser }: Props) {
             className={d.field()}
             value={prefs.displayName}
             placeholder="Иван Петров"
-            maxLength={60}
+            maxLength={PROFILE_DISPLAY_NAME_MAX}
             autoComplete="name"
             onChange={(e) => setPrefs({ ...prefs, displayName: e.target.value })}
           />
@@ -160,10 +196,10 @@ export function ProfileIdentityPanel({ d, prefs, setPrefs, authUser }: Props) {
             className={`${d.field()} min-h-[4.5rem] resize-y`}
             value={prefs.signature}
             placeholder="Помогаю команде проводить ретро и фиксировать договорённости."
-            maxLength={200}
-            onChange={(e) => setPrefs({ ...prefs, signature: e.target.value })}
+            maxLength={PROFILE_SIGNATURE_MAX}
+            onChange={(e) => setPrefs({ ...prefs, signature: clampSignature(e.target.value) })}
           />
-          <ProfileCharCount d={d} current={prefs.signature.length} max={200} />
+          <ProfileCharCount d={d} current={prefs.signature.length} max={PROFILE_SIGNATURE_MAX} />
         </ProfileField>
       </ProfileCard>
 
@@ -195,7 +231,7 @@ export function ProfileIdentityPanel({ d, prefs, setPrefs, authUser }: Props) {
             prefix="@"
             value={prefs.telegram}
             placeholder="username"
-            maxLength={32}
+            maxLength={PROFILE_TELEGRAM_MAX}
             autoComplete="off"
             aria-invalid={!!telegramError}
             onChange={(e) => setPrefs({ ...prefs, telegram: normalizeTelegram(e.target.value) })}
@@ -208,7 +244,7 @@ export function ProfileIdentityPanel({ d, prefs, setPrefs, authUser }: Props) {
             type="url"
             value={prefs.website}
             placeholder="https://example.com"
-            maxLength={200}
+            maxLength={PROFILE_WEBSITE_MAX}
             aria-invalid={!!websiteError}
             onChange={(e) => setPrefs({ ...prefs, website: e.target.value })}
             onBlur={(e) => setPrefs({ ...prefs, website: normalizeWebsite(e.target.value) })}
@@ -221,7 +257,7 @@ export function ProfileIdentityPanel({ d, prefs, setPrefs, authUser }: Props) {
             type="tel"
             value={prefs.contact}
             placeholder="+7 …"
-            maxLength={40}
+            maxLength={PROFILE_CONTACT_MAX}
             autoComplete="tel"
             onChange={(e) => setPrefs({ ...prefs, contact: e.target.value })}
           />

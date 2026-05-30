@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import type { AuthUserDto } from "../../api";
 import type { UserProfilePrefs } from "../../lib/profilePrefs";
 import type { ProfileDesign } from "./profileDesign";
-import { displayHandle, initials } from "./profileUser";
+import { displayNameWithStatus, initials } from "./profileUser";
 
 type Props = {
   d: ProfileDesign;
@@ -94,7 +94,7 @@ export function ProfileUserCard({
   const [zoomOpen, setZoomOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const hasAvatar = !!prefs.avatarDataUrl;
-  const name = displayHandle(prefs, authUser);
+  const name = displayNameWithStatus(prefs, authUser);
   const role = authUser?.globalRole === "admin" ? "Администратор" : authUser ? "Участник" : "Гость";
 
   const pickPhoto = () => fileRef.current?.click();

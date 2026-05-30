@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { notifyLobbyPrefsChanged } from "../../../lib/roomLobbyPrefs";
 import type { ProfileDesign } from "../profileDesign";
 import {
   LobbyFavoritesSection,
@@ -13,11 +13,11 @@ type Props = {
   d: ProfileDesign;
   visitedCount: number;
   favoriteCount: number;
+  lobbyRevision: number;
 };
 
-export function ProfileLobbyPanel({ d, visitedCount, favoriteCount }: Props) {
-  const [listRevision, setListRevision] = useState(0);
-  const { favorites, recent, liveCount } = useLobbyRoomLists(listRevision);
+export function ProfileLobbyPanel({ d, visitedCount, favoriteCount, lobbyRevision }: Props) {
+  const { favorites, recent, liveCount } = useLobbyRoomLists(lobbyRevision);
 
   return (
     <ProfileSectionFrame d={d} sectionId="lobby">
@@ -26,7 +26,7 @@ export function ProfileLobbyPanel({ d, visitedCount, favoriteCount }: Props) {
 
         <LobbyInsightStrip d={d} visitedCount={visitedCount} favoriteCount={favoriteCount} liveCount={liveCount} />
 
-        <LobbyFavoritesSection d={d} favorites={favorites} onFavoriteChange={() => setListRevision((n) => n + 1)} />
+        <LobbyFavoritesSection d={d} favorites={favorites} onFavoriteChange={() => notifyLobbyPrefsChanged()} />
 
         <LobbyRecentSection d={d} recent={recent} />
       </div>

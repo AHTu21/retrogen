@@ -1,4 +1,5 @@
 import type { ProfileDesign } from "../profileDesign";
+import type { ProfileSectionId } from "../profileHubTheme";
 import {
   DANGER_ACTIONS,
   DangerActionCard,
@@ -9,16 +10,21 @@ import { ProfileSectionFrame } from "../profileUi";
 
 type Props = {
   d: ProfileDesign;
+  onGoSection: (id: ProfileSectionId) => void;
 };
 
-export function ProfileDangerPanel({ d }: Props) {
+export function ProfileDangerPanel({ d, onGoSection }: Props) {
   return (
     <ProfileSectionFrame d={d} sectionId="danger">
       <div className="flex min-w-0 flex-col gap-8">
         <DangerHero d={d} />
 
-        <div className={`${d.noticeDanger} px-4 py-3 text-[0.8125rem] leading-relaxed ${d.rSm}`}>
-          Кнопки ниже пока отключены: функции подключаются для корпоративных клиентов после проверки личности.
+        <div className={`${d.noticeInfo} px-4 py-3 text-[0.8125rem] leading-relaxed ${d.rSm}`}>
+          Локальную копию настроек (JSON) можно скачать в разделе{" "}
+          <button type="button" className={d.link} onClick={() => onGoSection("security")}>
+            Безопасность → Резервная копия
+          </button>
+          . Ниже — корпоративные запросы GDPR и удаление аккаунта (пока недоступны).
         </div>
 
         <section className="space-y-3">

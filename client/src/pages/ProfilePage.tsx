@@ -7,6 +7,7 @@ import { MessengerNavIconButton } from "../components/MessengerNavIconButton";
 import { ThemeCornersIconButtons } from "../components/ThemeCornersIconButtons";
 import { fetchAuthMe, logoutAccount, updateAuthDisplayName, type AuthUserDto } from "../api";
 import { applyProfileBackup, downloadProfileBackup, parseProfileBackup } from "../lib/profileBackup";
+import { identityHasBlockingErrors } from "../lib/profileIdentityValidation";
 import { profileAccentCssVars } from "../lib/profileAccent";
 import {
   loadProfilePrefs,
@@ -14,7 +15,8 @@ import {
   saveProfilePrefs,
   type UserProfilePrefs,
 } from "../lib/profilePrefs";
-import { getFavoriteSlugs, getVisitedRooms } from "../lib/roomLobbyPrefs";
+import { useLobbyPrefsSync } from "../lib/useLobbyPrefsSync";
+import { notifyProfilePrefsChanged } from "../lib/useProfilePrefsSync";
 import { useAppCorners, useAppTheme } from "../theme";
 import { createProfileDesign } from "./profile/profileDesign";
 import { ProfileSidebar } from "./profile/ProfileSidebar";
@@ -26,6 +28,8 @@ import {
   PROFILE_NAV_VISIBLE,
   type ProfileSectionId,
 } from "./profile/profileHubTheme";
+
+const VALIDATION_SAVE_MSG = "Исправьте Telegram или сайт перед сохранением.";
 
 export function ProfilePage() {
   const navigate = useNavigate();
@@ -51,10 +55,10 @@ export function ProfilePage() {
   const [authUser, setAuthUser] = useState<AuthUserDto | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
 
-  const visitedCount = useMemo(() => getVisitedRooms().length, [savedHint]);
-  const favoriteCount = useMemo(() => getFavoriteSlugs().length, [savedHint]);
-  const visited = useMemo(() => getVisitedRooms().slice(0, 6), [savedHint]);
+  const lobby = useLobbyPrefsSync();
+  const { visitedCount, favoriteCount, visitedPreview: visited } = lobby;
   const isDirty = JSON.stringify(prefs) !== savedSnapshot;
+  const validationBlocked = identityHasBlockingErrors(prefs);
 
   const navItems = useMemo(
     () => PROFILE_NAV_VISIBLE.filter((n) => !n.guestHidden || authUser),
@@ -83,6 +87,17 @@ export function ProfilePage() {
     document.documentElement.classList.add("profile-no-scroll-x");
     return () => document.documentElement.classList.remove("profile-no-scroll-x");
   }, []);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (isDirty) return;
+      const loaded = loadProfilePrefs();
+      setPrefs(loaded);
+      setSavedSnapshot(JSON.stringify(loaded));
+    };
+    window.addEventListener("retrogen-profile", refresh);
+    return () => window.removeEventListener("retrogen-profile", refresh);
+  }, [isDirty]);
 
   useEffect(() => {
     if (!authUser && (section === "organization" || section === "billing" || section === "danger")) {
@@ -136,7 +151,7 @@ export function ProfilePage() {
       setPrefs(safe);
       setSavedSnapshot(JSON.stringify(safe));
       try {
-        window.dispatchEvent(new CustomEvent("retrogen-profile"));
+        notifyProfilePrefsChanged();
       } catch {
         /* ignore */
       }
@@ -191,7 +206,20 @@ export function ProfilePage() {
           }
           const safe = applyProfileBackup(parsed);
           setPrefs(safe);
-          commit(safe);
+          setSavedSnapshot(JSON.stringify(safe));
+          setSaveError(null);
+          const trimmed = safe.displayName.trim();
+          if (authUser && trimmed && trimmed !== authUser.displayName && nameSyncRef.current !== trimmed) {
+            nameSyncRef.current = trimmed;
+            void updateAuthDisplayName(trimmed)
+              .then((user) => {
+                setAuthUser(user);
+                nameSyncRef.current = null;
+              })
+              .catch(() => {
+                nameSyncRef.current = null;
+              });
+          }
           setSavedHint("Импортировано");
           window.setTimeout(() => setSavedHint(null), 2000);
         } catch {
@@ -200,7 +228,7 @@ export function ProfilePage() {
       };
       reader.readAsText(file);
     },
-    [commit],
+    [authUser],
   );
 
   const autosaveReady = useRef(false);
@@ -210,9 +238,14 @@ export function ProfilePage() {
       return;
     }
     if (!isDirty) return;
+    if (validationBlocked) {
+      setSaveError(VALIDATION_SAVE_MSG);
+      return;
+    }
+    setSaveError((e) => (e === VALIDATION_SAVE_MSG ? null : e));
     const timer = window.setTimeout(() => commit(prefs), 450);
     return () => window.clearTimeout(timer);
-  }, [prefs, isDirty, commit]);
+  }, [prefs, isDirty, validationBlocked, commit]);
 
   function readImageFile(f: File | undefined, onUrl: (url: string) => void) {
     if (!f) return;
@@ -282,7 +315,9 @@ export function ProfilePage() {
             <div className="flex flex-wrap items-center gap-2.5">
               {savedHint || isDirty ? (
                 <span
-                  className={savedHint ? d.savePillActive : d.savePill}
+                  className={
+                    savedHint ? d.savePillActive : validationBlocked ? d.savePillWarn : d.savePill
+                  }
                   role="status"
                   aria-live="polite"
                   aria-atomic="true"
@@ -298,6 +333,8 @@ export function ProfilePage() {
                       </svg>
                       {savedHint}
                     </>
+                  ) : validationBlocked ? (
+                    "Не сохранено — проверьте поля"
                   ) : (
                     "Сохранение…"
                   )}
@@ -363,6 +400,7 @@ export function ProfilePage() {
                   visited={visited}
                   visitedCount={visitedCount}
                   favoriteCount={favoriteCount}
+                  lobbyRevision={lobby.revision}
                   onWallpaperFile={onWallpaperFile}
                   onGoSection={goSection}
                   onLogout={() => {

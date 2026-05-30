@@ -1,6 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { AuthUserDto } from "../../api";
+import {
+  buildProfileCompletionTasks,
+  profileCompletionPercent,
+  type ProfileCompletionTask,
+} from "../../lib/profileCompletion";
 import type { UserProfilePrefs } from "../../lib/profilePrefs";
 import { effectiveBoardWallpaper } from "../../lib/profilePrefs";
 import type { VisitedRoomEntry } from "../../lib/roomLobbyPrefs";
@@ -9,7 +14,7 @@ import type { ProfileSectionId } from "./profileHubTheme";
 import { PROFILE_NAV } from "./profileHubTheme";
 import { LobbySessionRow } from "./profileLobbyUi";
 import { profileNavIcon } from "./profileNavIcons";
-import { displayHandle, initials } from "./profileUser";
+import { displayNameWithStatus, initials } from "./profileUser";
 
 function greetingByHour(): string {
   const h = new Date().getHours();
@@ -19,25 +24,10 @@ function greetingByHour(): string {
   return "Доброй ночи";
 }
 
-type ProfileTask = {
-  id: string;
-  label: string;
-  done: boolean;
-  section: ProfileSectionId;
-};
+type ProfileTask = ProfileCompletionTask;
 
 export function buildProfileTasks(prefs: UserProfilePrefs, authUser: AuthUserDto | null): ProfileTask[] {
-  const hasName = !!(prefs.displayName.trim() || authUser?.displayName?.trim());
-  const hasBoardStyle = !!(prefs.boardBackdrop.trim() || effectiveBoardWallpaper(prefs));
-
-  return [
-    { id: "name", label: "Имя для комнаты", done: hasName, section: "identity" },
-    { id: "avatar", label: "Фото профиля", done: !!prefs.avatarDataUrl, section: "identity" },
-    { id: "bio", label: "Коротко «О себе»", done: !!prefs.signature.trim(), section: "identity" },
-    { id: "role", label: "Роль или команда", done: !!(prefs.roleTitle.trim() || prefs.teamName.trim()), section: "identity" },
-    { id: "room", label: "Оформление доски", done: hasBoardStyle, section: "room" },
-    { id: "notepad", label: "Заметки в блокноте", done: !!prefs.notepad.trim(), section: "notepad" },
-  ];
+  return buildProfileCompletionTasks(prefs, authUser);
 }
 
 export function OverviewWelcomeHero({
@@ -49,7 +39,7 @@ export function OverviewWelcomeHero({
   prefs: UserProfilePrefs;
   authUser: AuthUserDto | null;
 }) {
-  const name = displayHandle(prefs, authUser);
+  const name = displayNameWithStatus(prefs, authUser);
   const roleLine = [prefs.roleTitle.trim(), prefs.teamName.trim()].filter(Boolean).join(" · ");
   const signedIn = !!authUser;
 
@@ -118,8 +108,8 @@ export function buildOverviewHubItems(
       : "По умолчанию";
   const notepadWords = prefs.notepad.trim().split(/\s+/).filter(Boolean).length;
   const notepadValue = notepadWords ? `${notepadWords} слов` : "Пусто";
-  const tasks = buildProfileTasks(prefs, authUser);
-  const profilePct = Math.round((tasks.filter((t) => t.done).length / tasks.length) * 100);
+  const tasks = buildProfileCompletionTasks(prefs, authUser);
+  const profilePct = profileCompletionPercent(tasks);
   const roomsWord = visitedCount === 1 ? "комната" : visitedCount < 5 ? "комнаты" : "комнат";
   const favWord = favoriteCount === 1 ? "звезда" : favoriteCount < 5 ? "звезды" : "звёздочек";
 

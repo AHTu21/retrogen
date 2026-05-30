@@ -72,7 +72,9 @@ export function parseProfileHash(): ProfileSectionId {
   const raw = window.location.hash.replace(/^#/, "");
   const id = (HASH_ALIASES[raw] ?? raw) as ProfileSectionId;
   const hit = PROFILE_NAV.find((n) => n.id === id);
-  if (!hit || hit.locked || hit.navHidden) return DEFAULT_PROFILE_SECTION;
+  if (!hit) return DEFAULT_PROFILE_SECTION;
+  if (hit.locked) return hit.id;
+  if (hit.navHidden) return DEFAULT_PROFILE_SECTION;
   return hit.id;
 }
 
