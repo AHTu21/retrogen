@@ -72,6 +72,10 @@ function isMode(v: unknown): v is SettingsWindowMode {
   return v === "window" || v === "fullscreen";
 }
 
+function isFiniteNum(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
 export function loadSettingsHubLayout(): SettingsHubLayout {
   try {
     const raw = localStorage.getItem(SETTINGS_LAYOUT_KEY);
@@ -79,11 +83,12 @@ export function loadSettingsHubLayout(): SettingsHubLayout {
     const p = JSON.parse(raw) as Partial<SettingsHubLayout>;
     const preset = isPreset(p.preset) ? p.preset : DEFAULT_PRESET;
     const base = SIZE_PRESETS[preset];
+    const fallbackPos = centerWindow(base.width, base.height);
     const merged: SettingsHubLayout = {
-      x: typeof p.x === "number" ? p.x : centerWindow(base.width, base.height).x,
-      y: typeof p.y === "number" ? p.y : centerWindow(base.width, base.height).y,
-      width: typeof p.width === "number" ? p.width : base.width,
-      height: typeof p.height === "number" ? p.height : base.height,
+      x: isFiniteNum(p.x) ? p.x : fallbackPos.x,
+      y: isFiniteNum(p.y) ? p.y : fallbackPos.y,
+      width: isFiniteNum(p.width) ? p.width : base.width,
+      height: isFiniteNum(p.height) ? p.height : base.height,
       mode: isMode(p.mode) ? p.mode : "window",
       preset,
       section: isSectionId(p.section) ? p.section : DEFAULT_SECTION,
