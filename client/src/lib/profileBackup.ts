@@ -1,5 +1,12 @@
 import { loadProfilePrefs, saveProfilePrefs, type UserProfilePrefs } from "./profilePrefs";
-import { getFavoriteSlugs, getVisitedRooms } from "./roomLobbyPrefs";
+import { notifyProfilePrefsChanged } from "./useProfilePrefsSync";
+import {
+  getFavoriteSlugs,
+  getVisitedRooms,
+  restoreFavoriteSlugs,
+  restoreVisitedRooms,
+  type VisitedRoomEntry,
+} from "./roomLobbyPrefs";
 
 export const PROFILE_BACKUP_VERSION = 1 as const;
 
@@ -8,7 +15,7 @@ export type ProfileBackupV1 = {
   exportedAt: string;
   app: "retrogen";
   profile: UserProfilePrefs;
-  visitedRooms?: ReturnType<typeof getVisitedRooms>;
+  visitedRooms?: VisitedRoomEntry[];
   favoriteSlugs?: string[];
 };
 
@@ -54,24 +61,8 @@ export function downloadProfileBackup(): void {
 
 export function applyProfileBackup(backup: ProfileBackupV1): UserProfilePrefs {
   saveProfilePrefs(backup.profile);
-  if (backup.visitedRooms?.length) {
-    try {
-      localStorage.setItem("retrogen_visited_rooms_v1", JSON.stringify(backup.visitedRooms));
-    } catch {
-      /* ignore */
-    }
-  }
-  if (backup.favoriteSlugs?.length) {
-    try {
-      localStorage.setItem("retrogen_favorite_slugs_v1", JSON.stringify(backup.favoriteSlugs));
-    } catch {
-      /* ignore */
-    }
-  }
-  try {
-    window.dispatchEvent(new CustomEvent("retrogen-profile"));
-  } catch {
-    /* ignore */
-  }
+  if (backup.visitedRooms?.length) restoreVisitedRooms(backup.visitedRooms);
+  if (backup.favoriteSlugs?.length) restoreFavoriteSlugs(backup.favoriteSlugs);
+  notifyProfilePrefsChanged();
   return loadProfilePrefs();
 }

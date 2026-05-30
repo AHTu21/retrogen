@@ -3,8 +3,10 @@ import type { UserProfilePrefs } from "../../lib/profilePrefs";
 import type { VisitedRoomEntry } from "../../lib/roomLobbyPrefs";
 import type { ProfileDesign } from "./profileDesign";
 import type { ProfileSectionId } from "./profileHubTheme";
+import { PROFILE_NAV } from "./profileHubTheme";
 import { ProfileRoomPanel } from "./ProfileRoomPanel";
 import { ProfileDangerPanel } from "./panels/ProfileDangerPanel";
+import { ProfileRoadmapPanel } from "./panels/ProfileRoadmapPanel";
 import { ProfileIdentityPanel } from "./panels/ProfileIdentityPanel";
 import { ProfileLobbyPanel } from "./panels/ProfileLobbyPanel";
 import { ProfileNotepadPanel } from "./panels/ProfileNotepadPanel";
@@ -21,6 +23,7 @@ export type ProfilePanelsProps = {
   visited: VisitedRoomEntry[];
   visitedCount: number;
   favoriteCount: number;
+  lobbyRevision: number;
   onWallpaperFile: (f: File | undefined) => void;
   onLogout: () => void;
   onGoSection: (id: ProfileSectionId) => void;
@@ -37,6 +40,7 @@ export function ProfileSectionPanels({
   visited,
   visitedCount,
   favoriteCount,
+  lobbyRevision,
   onWallpaperFile,
   onLogout,
   onGoSection,
@@ -77,7 +81,7 @@ export function ProfileSectionPanels({
 
   if (section === "lobby") {
     return (
-      <ProfileLobbyPanel d={d} visitedCount={visitedCount} favoriteCount={favoriteCount} />
+      <ProfileLobbyPanel d={d} visitedCount={visitedCount} favoriteCount={favoriteCount} lobbyRevision={lobbyRevision} />
     );
   }
 
@@ -98,7 +102,12 @@ export function ProfileSectionPanels({
   }
 
   if (section === "danger") {
-    return <ProfileDangerPanel d={d} />;
+    return <ProfileDangerPanel d={d} onGoSection={onGoSection} />;
+  }
+
+  const roadmapMeta = PROFILE_NAV.find((n) => n.id === section && n.locked);
+  if (roadmapMeta) {
+    return <ProfileRoadmapPanel d={d} meta={roadmapMeta} />;
   }
 
   return null;

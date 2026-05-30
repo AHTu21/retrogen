@@ -190,7 +190,7 @@ export function SecurityDataPortability({
           <button type="button" className={d.btnPrimary} onClick={onExport}>
             Скачать .json
           </button>
-          <label className={`cursor-pointer ${d.btnSecondary}`}>
+          <label className={`inline-flex cursor-pointer ${d.btnSecondary}`}>
             <input
               type="file"
               accept="application/json,.json"
@@ -276,8 +276,8 @@ export const DANGER_ACTIONS: DangerAction[] = [
   {
     id: "export",
     icon: "📦",
-    title: "Экспорт персональных данных",
-    description: "Выгрузка профиля и связанной активности по запросу GDPR или внутреннему регламенту.",
+    title: "Полный GDPR-архив",
+    description: "Расширенная выгрузка активности по запросу GDPR или внутреннему регламенту (не путать с JSON в «Безопасность»).",
     consequences: ["Формат JSON или архив по email", "Обработка командой поддержки", "Срок — до 30 рабочих дней"],
     buttonLabel: "Запросить",
     corporateOnly: true,
@@ -358,8 +358,9 @@ export function DangerActionCard({ d, action }: { d: ProfileDesign; action: Dang
         <button
           type="button"
           disabled
+          aria-disabled="true"
           title="Доступно в корпоративных тарифах"
-          className={`${d.btnAction} shrink-0 border-red-500/20 opacity-50`}
+          className={`${d.btnAction} shrink-0 cursor-not-allowed border-red-500/20 opacity-50`}
         >
           {action.buttonLabel}
         </button>

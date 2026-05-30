@@ -32,7 +32,8 @@ import { MessengerProfileSettingsModal } from "./MessengerProfileSettingsModal";
 import { MessengerProfileDetailsModal } from "./MessengerProfileDetailsModal";
 import { useProfilePrefsSync } from "../../lib/useProfilePrefsSync";
 import type { ChatListItemDto } from "../../types/messenger";
-import { MESSENGER_CHAT_EMOJI, pickMessengerEmoji } from "../../lib/messengerEmoji";
+import { pickMessengerEmoji } from "../../lib/messengerEmoji";
+import { PROFILE_STATUS_EMOJI } from "../../lib/profileStatusEmoji";
 import {
   IconMegaphone,
   IconPencil,
@@ -42,51 +43,6 @@ import {
   IconUsers,
   IconUsersPlus,
 } from "./MessageComposerIcons";
-
-const PROFILE_STATUS_EMOJI = [
-  "",
-  ...new Set([
-    "🙂",
-    "😊",
-    "😎",
-    "😀",
-    "🥳",
-    "😴",
-    "🤔",
-    "😮",
-    "😍",
-    "🤗",
-    "🫡",
-    "🔥",
-    "✨",
-    "💯",
-    "❤️",
-    "💼",
-    "🎮",
-    "☕",
-    "🍕",
-    "🏠",
-    "🌙",
-    "🌧️",
-    "✈️",
-    "🎉",
-    "💬",
-    "👋",
-    "🙌",
-    "👀",
-    "📵",
-    "🤒",
-    "📌",
-    "🛠️",
-    "📢",
-    "🐛",
-    "💪",
-    "🎊",
-    "😡",
-    "🤷",
-    ...MESSENGER_CHAT_EMOJI,
-  ]),
-];
 
 type RailPanel = "profile" | "contacts" | "newGroup" | "newChannel" | "settings";
 

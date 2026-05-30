@@ -53,6 +53,7 @@ export type ProfileDesign = {
   statTile: string;
   savePill: string;
   savePillActive: string;
+  savePillWarn: string;
   field: (extra?: string) => string;
 };
 
@@ -170,6 +171,8 @@ export function createProfileDesign(isLight: boolean, isRounded: boolean): Profi
     savePill: `hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.75rem] font-medium sm:inline-flex ${muted} bg-[var(--ph-surface-elevated)] ring-1 ring-[var(--ph-border)]`,
 
     savePillActive: `hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.75rem] font-medium sm:inline-flex text-[var(--ph-accent)] bg-[var(--ph-nav-active-bg)]`,
+
+    savePillWarn: `hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.75rem] font-medium sm:inline-flex text-amber-800 dark:text-amber-200 bg-amber-500/12 ring-1 ring-amber-500/25`,
 
     field: (extra = "") =>
       `w-full border px-3 py-2 text-[0.8125rem] outline-none transition focus:ring-2 focus:ring-[var(--ph-accent)]/30 ${rSm} ${extra} border-[var(--ph-input-border)] bg-[var(--ph-input-bg)] text-[var(--ph-text)] placeholder:text-[var(--ph-muted)]`,

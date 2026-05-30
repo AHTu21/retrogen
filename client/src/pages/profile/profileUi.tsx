@@ -35,11 +35,12 @@ export function ProfileSectionFrame({
 }) {
   const meta = PROFILE_NAV.find((n) => n.id === sectionId);
   if (!meta) return null;
+  const lead = meta.hint ?? meta.lockReason;
   return (
     <div className={compact ? "flex min-h-0 w-full flex-1 flex-col" : "min-w-0 w-full max-w-full overflow-x-clip"}>
       <header className={compact ? "mb-4 shrink-0 border-b border-[var(--ph-separator)] pb-4" : "mb-6 border-b border-[var(--ph-separator)] pb-5"}>
         <h1 className={d.pageTitle}>{meta.label}</h1>
-        {meta.hint && !compact ? <p className={d.pageLead}>{meta.hint}</p> : null}
+        {lead && !compact ? <p className={d.pageLead}>{lead}</p> : null}
       </header>
       {compact ? (
         <div className="flex min-h-0 w-full flex-1 flex-col">{children}</div>

@@ -8,6 +8,12 @@ export function displayHandle(prefs: UserProfilePrefs, authUser: AuthUserDto | n
   return "Гость";
 }
 
+export function displayNameWithStatus(prefs: UserProfilePrefs, authUser: AuthUserDto | null) {
+  const name = displayHandle(prefs, authUser);
+  const emoji = prefs.emojiStatus.trim();
+  return emoji ? `${emoji} ${name}` : name;
+}
+
 export function initials(prefs: UserProfilePrefs, authUser: AuthUserDto | null) {
   const name = displayHandle(prefs, authUser);
   const parts = name.split(/\s+/).filter(Boolean);

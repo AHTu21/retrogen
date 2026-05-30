@@ -1,4 +1,10 @@
 export const PROFILE_SIGNATURE_MAX = 1000;
+export const PROFILE_DISPLAY_NAME_MAX = 120;
+export const PROFILE_PROFILE_EMAIL_MAX = 120;
+export const PROFILE_TELEGRAM_MAX = 32;
+export const PROFILE_WEBSITE_MAX = 200;
+export const PROFILE_CONTACT_MAX = 40;
+export const PROFILE_EMOJI_STATUS_MAX = 8;
 
 export type ProfileGenderValue = "" | "male" | "female" | "unspecified";
 

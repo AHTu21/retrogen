@@ -1,3 +1,5 @@
+import type { UserProfilePrefs } from "./profilePrefs";
+
 /** Лёгкая валидация полей профиля (без Zod — только подсказки в UI). */
 
 export function validateTelegram(raw: string): string | null {
@@ -19,4 +21,9 @@ export function validateWebsite(raw: string): string | null {
   } catch {
     return "Некорректный URL";
   }
+}
+
+/** Блокирует autosave, если identity-поля явно невалидны. */
+export function identityHasBlockingErrors(prefs: Pick<UserProfilePrefs, "telegram" | "website">): boolean {
+  return !!(validateTelegram(prefs.telegram) || validateWebsite(prefs.website));
 }

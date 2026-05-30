@@ -9,6 +9,38 @@ export type VisitedRoomEntry = {
   lastVisitedAt: string;
 };
 
+export const LOBBY_PREFS_EVENT = "retrogen-lobby-prefs";
+
+export function notifyLobbyPrefsChanged() {
+  window.dispatchEvent(new CustomEvent(LOBBY_PREFS_EVENT));
+}
+
+function writeVisited(next: VisitedRoomEntry[]) {
+  localStorage.setItem(VISITED_KEY, JSON.stringify(next));
+  notifyLobbyPrefsChanged();
+}
+
+function writeFavorites(next: string[]) {
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
+  notifyLobbyPrefsChanged();
+}
+
+export function restoreVisitedRooms(entries: VisitedRoomEntry[]) {
+  try {
+    writeVisited(entries.slice(0, MAX_VISITED));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function restoreFavoriteSlugs(slugs: string[]) {
+  try {
+    writeFavorites(slugs.filter((s): s is string => typeof s === "string"));
+  } catch {
+    /* ignore */
+  }
+}
+
 function readVisited(): VisitedRoomEntry[] {
   try {
     const raw = localStorage.getItem(VISITED_KEY);
@@ -33,7 +65,7 @@ export function recordRoomVisit(p: { slug: string; themeSanitized: string; statu
   try {
     const cur = readVisited().filter((e) => e.slug !== p.slug);
     const next: VisitedRoomEntry[] = [{ ...p, lastVisitedAt: new Date().toISOString() }, ...cur].slice(0, MAX_VISITED);
-    localStorage.setItem(VISITED_KEY, JSON.stringify(next));
+    writeVisited(next);
   } catch {
     /* ignore */
   }
@@ -71,7 +103,7 @@ export function toggleFavoriteSlug(slug: string): boolean {
     nowFavorite = true;
   }
   try {
-    localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
+    writeFavorites(next);
   } catch {
     /* ignore */
   }
