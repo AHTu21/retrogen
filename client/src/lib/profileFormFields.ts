@@ -8,6 +8,7 @@ export const PROFILE_EMOJI_STATUS_MAX = 8;
 
 export type ProfileGenderValue = "" | "male" | "female" | "unspecified";
 
+/** @deprecated Legacy storage only — UI removed; данные сохраняются в JSON-бэкапе. */
 const GENDER_LABELS: Record<Exclude<ProfileGenderValue, "">, string> = {
   male: "Мужской",
   female: "Женский",

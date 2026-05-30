@@ -28,6 +28,13 @@ components/room/           — UI комнаты, связанный с проф
 
 **Правило зависимостей:** `lib/` не импортирует из `pages/`. Общие хелперы имени — только в `lib/profileUser.ts`.
 
+### Два хранилища «профиля» в UI
+
+| Ключ / модуль | Что хранит | Где UI |
+|---------------|------------|--------|
+| `retrogen_profile_v1` / `profilePrefs` | Identity, комната, блокнот | `/profile`, мессенджер (данные), комната |
+| `retrogen_messenger_profile_appearance_v1` | Фоны, форма аватара, цвета подписей | Только мессенджер → «Оформление» |
+
 ---
 
 ## Фазы
@@ -62,13 +69,11 @@ components/room/           — UI комнаты, связанный с проф
 
 ---
 
-### Фаза C — Legacy cleanup
+### Фаза C — Legacy cleanup ✅
 
-- Удалить `@deprecated profileShell` из `profileHubTheme.ts`
-- Gender/birthDate — только legacy storage; UI только в messenger modal или убрать
-- `messengerProfileAppearance` — документировать границу с `profilePrefs`
-
----
+- Удалены `profileShell` / `hubClasses` / `fieldClass` из `profileHubTheme.ts` (живой UI — `profileDesign.ts`).
+- Пол/день рождения убраны из UI мессенджера; поля остаются в `profilePrefs` для бэкапа.
+- Граница `messengerProfileAppearance` ↔ `profilePrefs` задокументирована в коде и roadmap.
 
 ### Фаза D — Locked → MVP
 

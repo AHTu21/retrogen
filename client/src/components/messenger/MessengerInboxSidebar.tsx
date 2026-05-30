@@ -25,7 +25,6 @@ import {
   type MessengerProfileAppearance,
   type MessengerSettingsButtonId,
 } from "../../lib/messengerProfileAppearance";
-import { genderDisplayLabel } from "../../lib/profileFormFields";
 import type { UserProfilePrefs } from "../../lib/profilePrefs";
 import { useProfilePrefsDraft } from "../../lib/useProfilePrefsDraft";
 import { MessengerProfileAppearanceModal } from "./MessengerProfileAppearanceModal";
@@ -881,14 +880,6 @@ function ProfilePanel({
             <div>{infoField("Тел.", draft.contact, { wide: true })}</div>
             <ProfileInfoDivider />
             <div>{infoField("Город", draft.city, { wide: true })}</div>
-          </dl>
-        </ProfileInfoCard>
-
-        <ProfileInfoCard heroStyle={heroStyle}>
-          <dl>
-            <div>{infoField("Пол", genderDisplayLabel(draft.gender), { wide: true })}</div>
-            <ProfileInfoDivider />
-            <div>{infoField("День рождения", draft.birthDate, { wide: true })}</div>
           </dl>
         </ProfileInfoCard>
       </div>

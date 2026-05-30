@@ -10,6 +10,7 @@
 
 ### Профиль (`/profile`) + мессенджер
 
+- **Legacy cleanup:** удалены мёртвые `profileShell`/`hubClasses`; пол/день рождения убраны из UI мессенджера (данные остаются в JSON-бэкапе).
 - **`useProfilePrefsDraft`:** ProfilePage и мессенджер на едином hook (autosave / manual commit, `onAfterCommit` для sync имени с API).
 
 ### Комната + профиль
