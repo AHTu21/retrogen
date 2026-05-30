@@ -147,3 +147,4 @@ components/room/           — UI комнаты, связанный с проф
 | 0.19.0 | Messenger cloud bridge + offline sync UX |
 | 0.20.0 | Retro-ended email notifications |
 | 0.21.0 | Weekly digest, product broadcast, S3 media, messenger cloud pull |
+| 0.22.0 | Login navigation fix (RR7), auth error copy, returnTo profile |

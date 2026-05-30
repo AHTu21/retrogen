@@ -15,6 +15,7 @@ import { profileAccentCssVars } from "../lib/profileAccent";
 import { MAX_WALLPAPER_CHARS, type UserProfilePrefs } from "../lib/profilePrefs";
 import { useLobbyPrefsSync } from "../lib/useLobbyPrefsSync";
 import { useProfilePrefsDraft } from "../lib/useProfilePrefsDraft";
+import { useGoProfileLogin } from "../lib/profileLoginNav";
 import { useProfileCloudSync } from "../lib/useProfileCloudSync";
 import { useAppCorners, useAppTheme } from "../theme";
 import { createProfileDesign } from "./profile/profileDesign";
@@ -84,6 +85,7 @@ export function ProfilePage() {
     [prefs.profileAccent, isLight],
   );
 
+  const goLogin = useGoProfileLogin();
   const lobby = useLobbyPrefsSync();
   const { visitedCount, favoriteCount, visitedPreview: visited } = lobby;
 
@@ -92,9 +94,25 @@ export function ProfilePage() {
     [authUser],
   );
 
-  useEffect(() => {
+  const refreshAuthUser = useCallback(() => {
     void fetchAuthMe().then(setAuthUser);
   }, []);
+
+  useEffect(() => {
+    refreshAuthUser();
+  }, [refreshAuthUser]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshAuthUser();
+    };
+    window.addEventListener("focus", refreshAuthUser);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", refreshAuthUser);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refreshAuthUser]);
 
   useEffect(() => {
     if (!authUser || authSeededRef.current) return;
@@ -366,9 +384,9 @@ export function ProfilePage() {
           {!authUser ? (
             <p className={`mb-4 px-4 py-3 text-[0.875rem] ${d.noticeBanner} ${d.rSm}`}>
               Гостевой режим — настройки только в этом браузере.{" "}
-              <Link to="/login" className={d.link}>
+              <button type="button" className={`${d.link} underline underline-offset-2`} onClick={goLogin}>
                 Войти
-              </Link>
+              </button>
             </p>
           ) : null}
 

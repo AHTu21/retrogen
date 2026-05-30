@@ -5,6 +5,7 @@ import type {
   MessengerUserSearchDto,
   SupportQuickCommandDto,
 } from "./types/messenger";
+import { authErrorMessage, wrapAuthNetworkError } from "./lib/authErrors";
 import { getAccessToken, setAccessToken } from "./lib/authToken";
 import { unlockHeadersForUrl } from "./lib/roomUnlockStorage";
 
@@ -403,36 +404,44 @@ export async function registerAccount(body: {
   password: string;
   displayName?: string;
 }): Promise<{ token: string; user: AuthUserDto }> {
-  const res = await fetch("/api/auth/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error ?? res.statusText);
+  try {
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(authErrorMessage((err as { error?: string }).error, res.status));
+    }
+    const data = (await res.json()) as { token: string; user: AuthUserDto };
+    setAccessToken(data.token);
+    return data;
+  } catch (e) {
+    throw wrapAuthNetworkError(e);
   }
-  const data = (await res.json()) as { token: string; user: AuthUserDto };
-  setAccessToken(data.token);
-  return data;
 }
 
 export async function loginAccount(body: {
   email: string;
   password: string;
 }): Promise<{ token: string; user: AuthUserDto }> {
-  const res = await fetch("/api/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error ?? res.statusText);
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(authErrorMessage((err as { error?: string }).error, res.status));
+    }
+    const data = (await res.json()) as { token: string; user: AuthUserDto };
+    setAccessToken(data.token);
+    return data;
+  } catch (e) {
+    throw wrapAuthNetworkError(e);
   }
-  const data = (await res.json()) as { token: string; user: AuthUserDto };
-  setAccessToken(data.token);
-  return data;
 }
 
 export async function updateAuthDisplayName(displayName: string): Promise<AuthUserDto> {

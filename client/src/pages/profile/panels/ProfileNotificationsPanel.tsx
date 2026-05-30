@@ -105,7 +105,7 @@ export function ProfileNotificationsPanel({ d, prefs, setPrefs, authUser, onGoSe
 
         {!signedIn ? (
           <p className={`${d.noticeBanner} px-4 py-3 text-[0.875rem] ${d.rSm}`}>
-            <Link to="/login" className={d.link}>
+            <Link to="/login?returnTo=%2Fprofile" className={d.link}>
               Войдите
             </Link>
             , чтобы получать email о завершении ретро и дайджесты.

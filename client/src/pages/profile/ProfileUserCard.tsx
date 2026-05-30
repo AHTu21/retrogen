@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import type { AuthUserDto } from "../../api";
+import { useGoProfileLogin } from "../../lib/profileLoginNav";
 import type { UserProfilePrefs } from "../../lib/profilePrefs";
 import type { ProfileDesign } from "./profileDesign";
 import { displayNameWithStatus, initials } from "./profileUser";
@@ -93,6 +94,7 @@ export function ProfileUserCard({
   avatarSrc,
   compact = false,
 }: Props) {
+  const goLogin = useGoProfileLogin();
   const [zoomOpen, setZoomOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const displayAvatar = avatarSrc ?? prefs.avatarDataUrl;
@@ -169,27 +171,27 @@ export function ProfileUserCard({
                 Лобби
               </Link>
               {!authUser ? (
-                <Link to="/login" className={d.btnGhost}>
+                <button type="button" className={d.btnGhost} onClick={goLogin}>
                   Войти
-                </Link>
+                </button>
               ) : null}
             </div>
           ) : null}
         </div>
 
         {!compact ? (
-          <div className="mt-3 hidden flex-col gap-2 lg:flex">
-            <Link to="/home" className={`${d.btnPrimary} w-full`}>
+          <div className="mt-3 flex flex-col gap-2">
+            {!authUser ? (
+              <button type="button" className={`${d.btnPrimary} w-full`} onClick={goLogin}>
+                Войти в аккаунт
+              </button>
+            ) : null}
+            <Link to="/home" className={`${authUser ? d.btnPrimary : d.btnSecondary} w-full`}>
               Открыть лобби
             </Link>
             <label htmlFor={fileInputId} className={`${d.btnSecondary} w-full cursor-pointer`}>
               {hasAvatar ? "Сменить фото" : "Добавить фото"}
             </label>
-            {!authUser ? (
-              <Link to="/login" className={`${d.btnGhost} w-full`}>
-                Войти в аккаунт
-              </Link>
-            ) : null}
           </div>
         ) : null}
       </div>
