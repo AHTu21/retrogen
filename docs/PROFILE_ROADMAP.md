@@ -102,13 +102,20 @@ components/room/           — UI комнаты, связанный с проф
 - `server/src/email/mailer.ts` — SMTP через `RETROGEN_SMTP_*` или лог в консоль без SMTP
 - Адрес: `profileEmail` из облака → email аккаунта
 
+### Фаза H — Notifications + storage ✅
+
+- **Дайджест:** `runWeeklyDigestBatch` + scheduler (каждые 12 ч, не чаще 1 раза в 7 дней на пользователя)
+- **Новости:** `POST /api/admin/notifications/product-updates` (admin)
+- **Журнал:** `UserNotificationLog` в Prisma
+- **Медиа:** `local` | `s3` (`RETROGEN_PROFILE_MEDIA_BACKEND`, `RETROGEN_S3_*`, опционально CDN redirect)
+- **Мессенджер:** `pullProfileCloudIfIdle` при открытии панели профиля
+
 ### Дальше
 
 | Задача | Приоритет |
 |--------|-----------|
-| Еженедельный дайджест и новости продукта | средний |
-| S3/CDN вместо `data/profile-media/` | средний |
-| Pull cloud при открытии панели мессенджера (без затирания черновика) | низкий |
+| Клиент: отображение статуса SMTP / последнего дайджеста | низкий |
+| История лобби на сервере для более точного дайджеста | низкий |
 
 ---
 
@@ -137,3 +144,6 @@ components/room/           — UI комнаты, связанный с проф
 | 0.16.0 | Notifications MVP, org/billing preview, room identity bridge, useProfilePrefsDraft |
 | 0.17.0 | Cloud profile sync API + identity/security polish |
 | 0.18.0 | Profile media upload + cloud conflict resolution |
+| 0.19.0 | Messenger cloud bridge + offline sync UX |
+| 0.20.0 | Retro-ended email notifications |
+| 0.21.0 | Weekly digest, product broadcast, S3 media, messenger cloud pull |

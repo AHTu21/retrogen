@@ -28,7 +28,20 @@ model User {
   chatMemberships  ChatMember[]
   createdChats     Chat[]       @relation("ChatCreator")
   messages         Message[]
-  hiddenMessages   MessageHidden[]
+  hiddenMessages        MessageHidden[]
+  notificationLogs      UserNotificationLog[]
+}
+
+/** Журнал исходящих email-уведомлений (дайджест, рассылки). */
+model UserNotificationLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String
+  refKey    String   @default("")
+  sentAt    DateTime @default(now())
+
+  @@index([userId, kind, sentAt])
 }
 
 /** Участник комнаты с ролью (расширяемо: co-facilitator, viewer). */

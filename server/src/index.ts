@@ -8,6 +8,7 @@ import fastifyStatic from "@fastify/static";
 import multipart from "@fastify/multipart";
 import { attachSocket } from "./socket.js";
 import { registerRoutes } from "./routes.js";
+import { startNotificationScheduler } from "./notifications/scheduler.js";
 import {
   MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_ATTACHMENT_BYTES,
@@ -49,6 +50,7 @@ async function main() {
   }
 
   await app.listen({ port, host });
+  startNotificationScheduler();
   app.log.info(`Retrogen server http://${host}:${port}`);
 }
 

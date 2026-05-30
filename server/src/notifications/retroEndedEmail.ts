@@ -2,6 +2,7 @@ import { parseCloudProfileV1 } from "../auth/profileJson.js";
 import { getAppUrl } from "../email/config.js";
 import { sendEmail } from "../email/mailer.js";
 import { prisma } from "../lib/prisma.js";
+import { escapeHtml } from "./emailTemplate.js";
 import { isValidEmail, resolveNotificationEmail } from "./resolveEmail.js";
 
 /** Уведомить участников комнаты (кроме фасилитатора) о завершении ретро. Не бросает наружу. */
@@ -67,12 +68,4 @@ export async function notifyRetroEndedBySlug(slug: string, actorUserId: string |
   } catch (err) {
     console.error("[notifyRetroEnded]", err);
   }
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
