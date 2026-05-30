@@ -298,6 +298,44 @@ html.theme-light .messenger-modal-scroll::-webkit-scrollbar-thumb:hover {
   background: rgb(24 24 27 / 0.26);
 }
 
+/* Settings Hub: тонкий скролл в sidebar и content */
+.settings-hub-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.settings-hub-scroll:hover {
+  scrollbar-color: rgb(255 255 255 / 0.16) transparent;
+}
+
+html.theme-light .settings-hub-scroll:hover {
+  scrollbar-color: rgb(24 24 27 / 0.14) transparent;
+}
+
+.settings-hub-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.settings-hub-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.settings-hub-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.16);
+}
+
+html.theme-light .settings-hub-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgb(24 24 27 / 0.14);
+}
+
+/* Мессенджер внутри hub — chips ближе к --ph-* */
+.settings-hub-messenger .messenger-modal-scroll {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 /* Профиль: тени/ring не должны расширять горизонтальную прокрутку документа */
 html.profile-no-scroll-x {
   overflow-x: clip;
