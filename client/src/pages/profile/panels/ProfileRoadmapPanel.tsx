@@ -22,8 +22,8 @@ export function ProfileRoadmapPanel({ d, meta }: Props) {
           <Link to="/profile#overview" className={d.btnSecondary}>
             К обзору
           </Link>
-          <Link to="/messages" className={d.btnGhost}>
-            Написать в поддержку →
+          <Link to="/profile#security" className={d.btnGhost}>
+            Безопасность и бэкап →
           </Link>
         </div>
       </div>

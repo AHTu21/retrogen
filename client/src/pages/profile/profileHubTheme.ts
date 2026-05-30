@@ -30,9 +30,7 @@ export const PROFILE_NAV: ProfileNavItem[] = [
   {
     id: "notifications",
     label: "Уведомления",
-    locked: true,
-    navHidden: true,
-    lockReason: "Email о завершении ретро — в roadmap",
+    hint: "Email о завершении ретро, дайджест и новости — настройки сохраняются в профиле",
   },
   {
     id: "organization",
@@ -59,7 +57,7 @@ export const PROFILE_NAV_VISIBLE = PROFILE_NAV.filter((n) => !n.navHidden);
 
 export const PROFILE_NAV_GROUPS: { title: string; ids: ProfileSectionId[] }[] = [
   { title: "Профиль", ids: ["overview", "identity", "room", "lobby", "notepad"] },
-  { title: "Система", ids: ["security", "danger"] },
+  { title: "Система", ids: ["notifications", "security", "danger"] },
 ];
 
 const HASH_ALIASES: Record<string, ProfileSectionId> = {

@@ -6,6 +6,9 @@ import {
   profileCompletionPercent,
   type ProfileCompletionTask,
 } from "../../lib/profileCompletion";
+import {
+  resolveProfileNotificationEmail,
+} from "../../lib/profileNotificationPrefs";
 import type { UserProfilePrefs } from "../../lib/profilePrefs";
 import { effectiveBoardWallpaper } from "../../lib/profilePrefs";
 import type { VisitedRoomEntry } from "../../lib/roomLobbyPrefs";
@@ -108,6 +111,13 @@ export function buildOverviewHubItems(
       : "По умолчанию";
   const notepadWords = prefs.notepad.trim().split(/\s+/).filter(Boolean).length;
   const notepadValue = notepadWords ? `${notepadWords} слов` : "Пусто";
+  const notifyEmail = resolveProfileNotificationEmail(prefs.profileEmail, authUser?.email ?? undefined);
+  const notifyOn = [
+    prefs.notifications.retroEnded,
+    prefs.notifications.weeklyDigest,
+    prefs.notifications.productUpdates,
+  ].filter(Boolean).length;
+  const notifyValue = authUser && notifyEmail ? `${notifyOn} вкл.` : authUser ? "Нет email" : "После входа";
   const tasks = buildProfileCompletionTasks(prefs, authUser);
   const profilePct = profileCompletionPercent(tasks);
   const roomsWord = visitedCount === 1 ? "комната" : visitedCount < 5 ? "комнаты" : "комнат";
@@ -159,6 +169,15 @@ export function buildOverviewHubItems(
       action: "План сессии",
       icon: profileNavIcon("notepad"),
       section: "notepad",
+    },
+    {
+      id: "notifications",
+      label: "Уведомления",
+      value: notifyValue,
+      metric: "email-рассылка",
+      action: "Завершение ретро и дайджест",
+      icon: profileNavIcon("notifications"),
+      section: "notifications",
     },
     {
       id: "workshop",

@@ -75,17 +75,12 @@ components/room/           — UI комнаты, связанный с проф
 - Пол/день рождения убраны из UI мессенджера; поля остаются в `profilePrefs` для бэкапа.
 - Граница `messengerProfileAppearance` ↔ `profilePrefs` задокументирована в коде и roadmap.
 
-### Фаза D — Locked → MVP
+### Фаза D — Locked → MVP ✅ (профиль)
 
-| Секция | MVP |
-|--------|-----|
-| `#notifications` | Email-тумблеры (local), форма без backend |
-| `#organization` | Read-only placeholder org |
-| `#billing` | Tariff card stub |
-
-Разблокировка: `locked: false`, `navHidden: false` в `PROFILE_NAV`.
-
----
+| Секция | Статус |
+|--------|--------|
+| `#notifications` | **MVP** — toggles в sidebar, prefs в `profilePrefs.notifications` |
+| `#organization`, `#billing` | Roadmap-панель (locked) |
 
 ### Фаза E — Cloud sync (бэклог)
 

@@ -9,6 +9,7 @@ import { ProfileDangerPanel } from "./panels/ProfileDangerPanel";
 import { ProfileRoadmapPanel } from "./panels/ProfileRoadmapPanel";
 import { ProfileIdentityPanel } from "./panels/ProfileIdentityPanel";
 import { ProfileLobbyPanel } from "./panels/ProfileLobbyPanel";
+import { ProfileNotificationsPanel } from "./panels/ProfileNotificationsPanel";
 import { ProfileNotepadPanel } from "./panels/ProfileNotepadPanel";
 import { ProfileOverviewPanel } from "./panels/ProfileOverviewPanel";
 import { ProfileSecurityPanel } from "./panels/ProfileSecurityPanel";
@@ -87,6 +88,18 @@ export function ProfileSectionPanels({
 
   if (section === "notepad") {
     return <ProfileNotepadPanel d={d} prefs={prefs} setPrefs={setPrefs} />;
+  }
+
+  if (section === "notifications") {
+    return (
+      <ProfileNotificationsPanel
+        d={d}
+        prefs={prefs}
+        setPrefs={setPrefs}
+        authUser={authUser}
+        onGoSection={onGoSection}
+      />
+    );
   }
 
   if (section === "security") {

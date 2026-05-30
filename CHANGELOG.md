@@ -10,6 +10,9 @@
 
 ### Профиль (`/profile`) + мессенджер
 
+### Профиль (`/profile`)
+
+- **Уведомления:** новый раздел в sidebar — email о завершении ретро, дайджест, новости; prefs в профиле, autosave; плитка на обзоре.
 - **Legacy cleanup:** удалены мёртвые `profileShell`/`hubClasses`; пол/день рождения убраны из UI мессенджера (данные остаются в JSON-бэкапе).
 - **`useProfilePrefsDraft`:** ProfilePage и мессенджер на едином hook (autosave / manual commit, `onAfterCommit` для sync имени с API).
 

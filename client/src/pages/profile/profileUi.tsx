@@ -173,7 +173,6 @@ export function ProfileInsetEmpty({ d, children }: { d: ProfileDesign; children:
   return <p className={`px-4 py-8 text-center text-[0.875rem] leading-relaxed ${d.muted}`}>{children}</p>;
 }
 
-/** Строка со значением и действием справа */
 export function ProfileValueRow({
   d,
   label,
@@ -201,6 +200,55 @@ export function ProfileValueRow({
         <div className={`mt-1 text-[0.875rem] ${d.muted}`}>{value}</div>
       </div>
       {action ? <div className="flex shrink-0 items-center">{action}</div> : null}
+    </div>
+  );
+}
+
+/** Строка с переключателем — macOS Settings style. */
+export function ProfileToggleRow({
+  d,
+  label,
+  hint,
+  checked,
+  onChange,
+  disabled,
+  divided,
+}: {
+  d: ProfileDesign;
+  label: string;
+  hint?: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+  divided?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-4 px-4 py-3.5 sm:px-5 sm:py-4 ${
+        divided ? `border-t ${d.insetRow}` : ""
+      } ${disabled ? "opacity-55" : ""}`}
+    >
+      <div className="min-w-0 flex-1 pr-2">
+        <p className="text-[0.8125rem] font-medium text-[var(--ph-text)]">{label}</p>
+        {hint ? <p className={`mt-0.5 text-[0.75rem] leading-relaxed ${d.muted}`}>{hint}</p> : null}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative h-7 w-[2.75rem] shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ph-accent)]/40 disabled:cursor-not-allowed ${
+          checked ? "bg-[var(--ph-accent)]" : "bg-[var(--ph-muted)]/25"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${
+            checked ? "translate-x-[1.125rem]" : "translate-x-0"
+          }`}
+        />
+      </button>
     </div>
   );
 }

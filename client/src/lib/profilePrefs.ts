@@ -4,6 +4,11 @@ import {
   normalizeProfileAccent,
 } from "./profileAccent";
 import {
+  DEFAULT_PROFILE_NOTIFICATIONS,
+  normalizeProfileNotifications,
+  type ProfileEmailNotifications,
+} from "./profileNotificationPrefs";
+import {
   DEFAULT_BOARD_BACKDROP,
   DEFAULT_HEADER_TINT,
   normalizeBoardBackdropColor,
@@ -90,6 +95,8 @@ export type UserProfilePrefs = {
   wallpaperOpacity: number;
   /** Эмодзи-статус в мессенджере и профиле */
   emojiStatus: string;
+  /** Email-уведомления (локально до серверной рассылки) */
+  notifications: ProfileEmailNotifications;
 };
 
 const defaultPrefs: UserProfilePrefs = {
@@ -116,6 +123,7 @@ const defaultPrefs: UserProfilePrefs = {
   wallpaperDataUrl: null,
   wallpaperOpacity: DEFAULT_WALLPAPER_OPACITY,
   emojiStatus: "",
+  notifications: { ...DEFAULT_PROFILE_NOTIFICATIONS },
 };
 
 const DATA_IMAGE_RE = /^data:image\//i;
@@ -164,7 +172,16 @@ function sanitizeProfilePrefs(p: UserProfilePrefs): UserProfilePrefs {
   const wallpaperOpacity = normalizeWallpaperOpacity(p.wallpaperOpacity);
   const emojiStatus = typeof p.emojiStatus === "string" ? p.emojiStatus.trim().slice(0, 8) : "";
 
-  return { ...p, avatarDataUrl, wallpaperDataUrl, boardBackdrop, headerTint, wallpaperOpacity, emojiStatus };
+  return {
+    ...p,
+    avatarDataUrl,
+    wallpaperDataUrl,
+    boardBackdrop,
+    headerTint,
+    wallpaperOpacity,
+    emojiStatus,
+    notifications: normalizeProfileNotifications(p.notifications),
+  };
 }
 
 export function loadProfilePrefs(): UserProfilePrefs {
@@ -211,6 +228,7 @@ export function loadProfilePrefs(): UserProfilePrefs {
       wallpaperDataUrl: typeof p.wallpaperDataUrl === "string" ? p.wallpaperDataUrl : null,
       wallpaperOpacity: normalizeWallpaperOpacity(p.wallpaperOpacity),
       emojiStatus: typeof p.emojiStatus === "string" ? p.emojiStatus.trim().slice(0, 8) : "",
+      notifications: normalizeProfileNotifications(p.notifications),
     };
     const sanitized = sanitizeProfilePrefs(loaded);
     if (JSON.stringify(sanitized) !== JSON.stringify(loaded)) {
