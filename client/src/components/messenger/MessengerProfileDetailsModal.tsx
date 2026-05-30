@@ -3,14 +3,7 @@ import { createPortal } from "react-dom";
 import { getMessengerModalPortalRoot } from "../../lib/messengerModalPortal";
 import { MessengerModalBackdrop } from "./MessengerModalBackdrop";
 import type { UserProfilePrefs } from "../../lib/profilePrefs";
-import {
-  birthDateFromInputValue,
-  birthDateToInputValue,
-  clampSignature,
-  normalizeGender,
-  PROFILE_SIGNATURE_MAX,
-  type ProfileGenderValue,
-} from "../../lib/profileFormFields";
+import { clampSignature, PROFILE_SIGNATURE_MAX } from "../../lib/profileFormFields";
 import { ProfilePhoneInput } from "./ProfilePhoneInput";
 
 type Props = {
@@ -23,13 +16,6 @@ type Props = {
   onClose: () => void;
   onSave: (draft: UserProfilePrefs) => void;
 };
-
-const GENDER_OPTIONS: { value: ProfileGenderValue; label: string }[] = [
-  { value: "", label: "Без выбора" },
-  { value: "male", label: "Мужской" },
-  { value: "female", label: "Женский" },
-  { value: "unspecified", label: "Не определён" },
-];
 
 function CloseIcon() {
   return (
@@ -63,16 +49,12 @@ export function MessengerProfileDetailsModal({
       setDraft({
         ...applied,
         signature: clampSignature(applied.signature),
-        gender: normalizeGender(applied.gender),
       });
       setAboutFocused(false);
     }
   }, [open, applied]);
 
   if (!open) return null;
-
-  const genderValue = normalizeGender(draft.gender);
-  const birthIso = birthDateToInputValue(draft.birthDate);
 
   return createPortal(
     <MessengerModalBackdrop onBackdropClick={onClose}>
@@ -160,36 +142,13 @@ export function MessengerProfileDetailsModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <FieldLabel>Пол</FieldLabel>
-              <select
-                className={inputClass}
-                value={genderValue}
-                onChange={(e) =>
-                  setDraft({ ...draft, gender: e.target.value as ProfileGenderValue })
-                }
-              >
-                {GENDER_OPTIONS.map((o) => (
-                  <option key={o.value || "none"} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <FieldLabel>День рождения</FieldLabel>
-              <input
-                type="date"
-                className={inputClass}
-                value={birthIso}
-                max={new Date().toISOString().slice(0, 10)}
-                onChange={(e) =>
-                  setDraft({ ...draft, birthDate: birthDateFromInputValue(e.target.value) })
-                }
-              />
-            </div>
-          </div>
+          <p className="text-[11px] leading-relaxed opacity-45">
+            Роль, местоимения и часовой пояс — в{" "}
+            <a href="/profile#identity" className="underline underline-offset-2">
+              настройках профиля
+            </a>
+            .
+          </p>
         </div>
 
         <div className={`shrink-0 border-t px-4 py-3 ${isLight ? "border-zinc-200" : "border-zinc-700"}`}>
@@ -201,7 +160,6 @@ export function MessengerProfileDetailsModal({
               onSave({
                 ...draft,
                 signature: clampSignature(draft.signature),
-                gender: normalizeGender(draft.gender),
               })
             }
           >

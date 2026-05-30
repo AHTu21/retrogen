@@ -5,18 +5,17 @@ import { RetrogenDockableHelpRoot, RetrogenDockableHelpToggle } from "../compone
 import { RetrogenOverflowMenu } from "../components/RetrogenOverflowMenu";
 import { MessengerNavIconButton } from "../components/MessengerNavIconButton";
 import { ThemeCornersIconButtons } from "../components/ThemeCornersIconButtons";
-import { fetchAuthMe, logoutAccount, updateAuthDisplayName, type AuthUserDto } from "../api";
+import { fetchAuthMe, logoutAccount, uploadProfileMedia, type AuthUserDto } from "../api";
+import { applyProfileAvatarFile, profileAvatarErrorMessage } from "../lib/profileAvatarUpload";
+import { seedProfileMediaCache } from "../lib/profileMediaCache";
+import { useProfileMediaDisplay } from "../lib/useProfileMediaDisplay";
+import { ProfileCloudConflictBanner } from "./profile/ProfileCloudConflictBanner";
 import { applyProfileBackup, downloadProfileBackup, parseProfileBackup } from "../lib/profileBackup";
-import { identityHasBlockingErrors } from "../lib/profileIdentityValidation";
 import { profileAccentCssVars } from "../lib/profileAccent";
-import {
-  loadProfilePrefs,
-  MAX_WALLPAPER_CHARS,
-  saveProfilePrefs,
-  type UserProfilePrefs,
-} from "../lib/profilePrefs";
+import { MAX_WALLPAPER_CHARS, type UserProfilePrefs } from "../lib/profilePrefs";
 import { useLobbyPrefsSync } from "../lib/useLobbyPrefsSync";
-import { notifyProfilePrefsChanged } from "../lib/useProfilePrefsSync";
+import { useProfilePrefsDraft } from "../lib/useProfilePrefsDraft";
+import { useProfileCloudSync } from "../lib/useProfileCloudSync";
 import { useAppCorners, useAppTheme } from "../theme";
 import { createProfileDesign } from "./profile/profileDesign";
 import { ProfileSidebar } from "./profile/ProfileSidebar";
@@ -29,8 +28,6 @@ import {
   type ProfileSectionId,
 } from "./profile/profileHubTheme";
 
-const VALIDATION_SAVE_MSG = "Исправьте Telegram или сайт перед сохранением.";
-
 export function ProfilePage() {
   const navigate = useNavigate();
   const { themeMode, toggleTheme } = useAppTheme();
@@ -42,23 +39,53 @@ export function ProfilePage() {
   const [section, setSection] = useState<ProfileSectionId>(() =>
     typeof window !== "undefined" ? parseProfileHash() : DEFAULT_PROFILE_SECTION,
   );
-  const [prefs, setPrefs] = useState<UserProfilePrefs>(() => loadProfilePrefs());
+  const authSeededRef = useRef(false);
+  const [authUser, setAuthUser] = useState<AuthUserDto | null>(null);
+  const [aboutOpen, setAboutOpen] = useState(false);
+
+  const scheduleCloudPushRef = useRef<(safe: UserProfilePrefs) => void>(() => {});
+
+  const {
+    prefs,
+    setPrefs,
+    isDirty,
+    validationBlocked,
+    saveError,
+    saveStatus,
+    commit,
+    replacePrefs,
+    flashHint,
+  } = useProfilePrefsDraft({
+    autosaveMs: 450,
+    blockOnIdentityErrors: true,
+    onAfterCommit: (safe) => {
+      scheduleCloudPushRef.current(safe);
+    },
+  });
+
+  const { cloudSyncLabel, cloudSyncState, cloudSyncMeta, scheduleCloudPush, retryCloudSync, cloudConflict, resolveCloudConflict } =
+    useProfileCloudSync({
+      authUser,
+      prefs,
+      isDirty,
+      validationBlocked,
+      onMergedFromCloud: (merged, hint) => {
+        replacePrefs(merged, hint);
+      },
+      onAuthUserUpdated: setAuthUser,
+    });
+
+  scheduleCloudPushRef.current = scheduleCloudPush;
+
+  const { avatarSrc, wallpaperSrc } = useProfileMediaDisplay(prefs);
+
   const accentStyle = useMemo(
     () => profileAccentCssVars(prefs.profileAccent, isLight),
     [prefs.profileAccent, isLight],
   );
-  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(loadProfilePrefs()));
-  const [savedHint, setSavedHint] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const authSeededRef = useRef(false);
-  const nameSyncRef = useRef<string | null>(null);
-  const [authUser, setAuthUser] = useState<AuthUserDto | null>(null);
-  const [aboutOpen, setAboutOpen] = useState(false);
 
   const lobby = useLobbyPrefsSync();
   const { visitedCount, favoriteCount, visitedPreview: visited } = lobby;
-  const isDirty = JSON.stringify(prefs) !== savedSnapshot;
-  const validationBlocked = identityHasBlockingErrors(prefs);
 
   const navItems = useMemo(
     () => PROFILE_NAV_VISIBLE.filter((n) => !n.guestHidden || authUser),
@@ -75,7 +102,7 @@ export function ProfilePage() {
     const serverName = authUser.displayName?.trim();
     if (!serverName) return;
     setPrefs((p) => (p.displayName.trim() ? p : { ...p, displayName: serverName }));
-  }, [authUser]);
+  }, [authUser, setPrefs]);
 
   useEffect(() => {
     const onHash = () => setSection(parseProfileHash());
@@ -87,17 +114,6 @@ export function ProfilePage() {
     document.documentElement.classList.add("profile-no-scroll-x");
     return () => document.documentElement.classList.remove("profile-no-scroll-x");
   }, []);
-
-  useEffect(() => {
-    const refresh = () => {
-      if (isDirty) return;
-      const loaded = loadProfilePrefs();
-      setPrefs(loaded);
-      setSavedSnapshot(JSON.stringify(loaded));
-    };
-    window.addEventListener("retrogen-profile", refresh);
-    return () => window.removeEventListener("retrogen-profile", refresh);
-  }, [isDirty]);
 
   useEffect(() => {
     if (!authUser && (section === "organization" || section === "billing" || section === "danger")) {
@@ -145,46 +161,10 @@ export function ProfilePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [section, navItems, goSection]);
 
-  const commit = useCallback(
-    (next: UserProfilePrefs) => {
-      const { prefs: safe, error } = saveProfilePrefs(next);
-      setPrefs(safe);
-      setSavedSnapshot(JSON.stringify(safe));
-      try {
-        notifyProfilePrefsChanged();
-      } catch {
-        /* ignore */
-      }
-      if (error === "quota") {
-        setSaveError("Недостаточно места в браузере — уменьшите обои или аватар.");
-        setSavedHint(null);
-        return;
-      }
-      setSaveError(null);
-      setSavedHint("Сохранено");
-      window.setTimeout(() => setSavedHint(null), 2000);
-
-      const trimmed = safe.displayName.trim();
-      if (authUser && trimmed && trimmed !== authUser.displayName && nameSyncRef.current !== trimmed) {
-        nameSyncRef.current = trimmed;
-        void updateAuthDisplayName(trimmed)
-          .then((user) => {
-            setAuthUser(user);
-            nameSyncRef.current = null;
-          })
-          .catch(() => {
-            nameSyncRef.current = null;
-          });
-      }
-    },
-    [authUser],
-  );
-
   const onExportBackup = useCallback(() => {
     downloadProfileBackup();
-    setSavedHint("Файл скачан");
-    window.setTimeout(() => setSavedHint(null), 2000);
-  }, []);
+    flashHint("Файл скачан");
+  }, [flashHint]);
 
   const onImportBackup = useCallback(
     (file: File | undefined) => {
@@ -205,47 +185,16 @@ export function ProfilePage() {
             return;
           }
           const safe = applyProfileBackup(parsed);
-          setPrefs(safe);
-          setSavedSnapshot(JSON.stringify(safe));
-          setSaveError(null);
-          const trimmed = safe.displayName.trim();
-          if (authUser && trimmed && trimmed !== authUser.displayName && nameSyncRef.current !== trimmed) {
-            nameSyncRef.current = trimmed;
-            void updateAuthDisplayName(trimmed)
-              .then((user) => {
-                setAuthUser(user);
-                nameSyncRef.current = null;
-              })
-              .catch(() => {
-                nameSyncRef.current = null;
-              });
-          }
-          setSavedHint("Импортировано");
-          window.setTimeout(() => setSavedHint(null), 2000);
+          replacePrefs(safe, "Импортировано");
+          scheduleCloudPush(safe);
         } catch {
           window.alert("Не удалось прочитать файл.");
         }
       };
       reader.readAsText(file);
     },
-    [authUser],
+    [replacePrefs, scheduleCloudPush],
   );
-
-  const autosaveReady = useRef(false);
-  useEffect(() => {
-    if (!autosaveReady.current) {
-      autosaveReady.current = true;
-      return;
-    }
-    if (!isDirty) return;
-    if (validationBlocked) {
-      setSaveError(VALIDATION_SAVE_MSG);
-      return;
-    }
-    setSaveError((e) => (e === VALIDATION_SAVE_MSG ? null : e));
-    const timer = window.setTimeout(() => commit(prefs), 450);
-    return () => window.clearTimeout(timer);
-  }, [prefs, isDirty, validationBlocked, commit]);
 
   function readImageFile(f: File | undefined, onUrl: (url: string) => void) {
     if (!f) return;
@@ -266,14 +215,46 @@ export function ProfilePage() {
   }
 
   function onAvatarFile(f: File | undefined) {
-    readImageFile(f, (url) => {
-      const next = { ...prefs, avatarDataUrl: url };
-      setPrefs(next);
-      commit(next);
+    void applyProfileAvatarFile(f, prefs, authUser).then((result) => {
+      if (!result.ok) {
+        if (result.reason !== "no_file") window.alert(profileAvatarErrorMessage(result.reason));
+        return;
+      }
+      setPrefs(result.prefs);
+      commit(result.prefs);
+      if (result.user) setAuthUser(result.user);
     });
   }
 
   function onWallpaperFile(f: File | undefined) {
+    if (!f) return;
+    if (!f.type.startsWith("image/")) {
+      window.alert("Выберите файл изображения.");
+      return;
+    }
+    if (authUser) {
+      void uploadProfileMedia("wallpaper", f)
+        .then((res) => {
+          readImageFile(f, (url) => {
+            if (url) seedProfileMediaCache(res.path, url);
+          });
+          const next = {
+            ...prefs,
+            wallpaperDataUrl: null,
+            wallpaperMediaPath: res.path,
+          };
+          setPrefs(next);
+          commit(next);
+        })
+        .catch(() => {
+          readImageFile(f, (url) => {
+            const next = { ...prefs, wallpaperDataUrl: url, wallpaperMediaPath: null };
+            setPrefs(next);
+            commit(next);
+          });
+        });
+      return;
+    }
     readImageFile(f, (url) => {
       const next = { ...prefs, wallpaperDataUrl: url };
       setPrefs(next);
@@ -288,8 +269,7 @@ export function ProfilePage() {
         автоматически.
       </p>
       <p className="mt-3 opacity-90">
-        Автосохранение в браузере. Имя при входе подставляется из аккаунта; экспорт JSON — в «Безопасность». Навигация: Alt+↑/↓
-        по разделам.
+        Автосохранение в браузере и синхронизация с аккаунтом после входа. Экспорт JSON — в «Безопасность». Навигация: Alt+↑/↓.
       </p>
     </>
   );
@@ -313,16 +293,40 @@ export function ProfilePage() {
               </p>
             </Link>
             <div className="flex flex-wrap items-center gap-2.5">
-              {savedHint || isDirty ? (
+              {cloudSyncLabel ? (
                 <span
                   className={
-                    savedHint ? d.savePillActive : validationBlocked ? d.savePillWarn : d.savePill
+                    cloudSyncState.kind === "synced"
+                      ? d.savePillActive
+                      : cloudSyncState.kind === "offline"
+                        ? d.savePill
+                        : d.savePill
+                  }
+                  role="status"
+                  aria-live="polite"
+                >
+                  {cloudSyncLabel}
+                </span>
+              ) : null}
+              {authUser && cloudSyncState.kind === "offline" ? (
+                <button type="button" className={d.btnGhost} onClick={() => void retryCloudSync()}>
+                  Повторить синх.
+                </button>
+              ) : null}
+              {saveStatus ? (
+                <span
+                  className={
+                    saveStatus.kind === "saved"
+                      ? d.savePillActive
+                      : saveStatus.kind === "blocked"
+                        ? d.savePillWarn
+                        : d.savePill
                   }
                   role="status"
                   aria-live="polite"
                   aria-atomic="true"
                 >
-                  {savedHint ? (
+                  {saveStatus.kind === "saved" ? (
                     <>
                       <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
                         <path
@@ -331,12 +335,10 @@ export function ProfilePage() {
                           clipRule="evenodd"
                         />
                       </svg>
-                      {savedHint}
+                      {saveStatus.text}
                     </>
-                  ) : validationBlocked ? (
-                    "Не сохранено — проверьте поля"
                   ) : (
-                    "Сохранение…"
+                    saveStatus.text
                   )}
                 </span>
               ) : null}
@@ -370,6 +372,16 @@ export function ProfilePage() {
             </p>
           ) : null}
 
+          {cloudConflict ? (
+            <ProfileCloudConflictBanner
+              d={d}
+              serverUpdatedAt={cloudConflict.serverUpdatedAt}
+              onKeepLocal={() => resolveCloudConflict("local")}
+              onTakeServer={() => resolveCloudConflict("server")}
+              onMerge={() => resolveCloudConflict("merge")}
+            />
+          ) : null}
+
           {saveError ? (
             <p className={`mb-4 px-4 py-3 text-[0.875rem] ${d.noticeBanner} ${d.rSm} border-amber-500/30 text-amber-900 dark:text-amber-100`}>
               {saveError}
@@ -387,6 +399,7 @@ export function ProfilePage() {
               favoriteCount={favoriteCount}
               onGoSection={goSection}
               onAvatarFile={onAvatarFile}
+              avatarSrc={avatarSrc}
             />
 
             <main className={d.detail} id="retrogen-profile-settings">
@@ -410,6 +423,12 @@ export function ProfilePage() {
                   }}
                   onExportBackup={onExportBackup}
                   onImportBackup={onImportBackup}
+                  cloudSyncLabel={cloudSyncLabel}
+                  cloudSyncState={cloudSyncState}
+                  cloudSyncMeta={cloudSyncMeta}
+                  onRetryCloudSync={retryCloudSync}
+                  avatarSrc={avatarSrc}
+                  wallpaperSrc={wallpaperSrc}
                 />
               </div>
             </main>

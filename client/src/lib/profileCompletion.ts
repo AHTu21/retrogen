@@ -1,7 +1,9 @@
 import type { AuthUserDto } from "../api";
 import type { UserProfilePrefs } from "./profilePrefs";
 import { effectiveBoardWallpaper } from "./profilePrefs";
-import type { ProfileSectionId } from "../pages/profile/profileHubTheme";
+import { resolveProfileNotificationEmail } from "./profileNotificationPrefs";
+import { profileHasAvatar } from "./profileMediaCache";
+import type { ProfileSectionId } from "./profileSections";
 
 export type ProfileCompletionTask = {
   id: string;
@@ -17,10 +19,15 @@ export function buildProfileCompletionTasks(
   const hasName = !!(prefs.displayName.trim() || authUser?.displayName?.trim());
   const hasBoardStyle = !!(prefs.boardBackdrop.trim() || effectiveBoardWallpaper(prefs));
   const shownEmail = prefs.profileEmail.trim() || authUser?.email?.trim() || "";
+  const notifyEmail = resolveProfileNotificationEmail(prefs.profileEmail, authUser?.email);
+  const notifyConfigured =
+    !!authUser &&
+    !!notifyEmail &&
+    (prefs.notifications.retroEnded || prefs.notifications.weeklyDigest || prefs.notifications.productUpdates);
 
-  return [
+  const tasks: ProfileCompletionTask[] = [
     { id: "name", label: "Имя для комнаты", done: hasName, section: "identity" },
-    { id: "avatar", label: "Фото профиля", done: !!prefs.avatarDataUrl, section: "identity" },
+    { id: "avatar", label: "Фото профиля", done: profileHasAvatar(prefs), section: "identity" },
     { id: "bio", label: "Коротко «О себе»", done: !!prefs.signature.trim(), section: "identity" },
     { id: "role", label: "Роль или команда", done: !!(prefs.roleTitle.trim() || prefs.teamName.trim()), section: "identity" },
     { id: "contact", label: "Email или контакт", done: !!shownEmail, section: "identity" },
@@ -28,6 +35,17 @@ export function buildProfileCompletionTasks(
     { id: "room", label: "Оформление доски", done: hasBoardStyle, section: "room" },
     { id: "notepad", label: "Заметки в блокноте", done: !!prefs.notepad.trim(), section: "notepad" },
   ];
+
+  if (authUser) {
+    tasks.splice(6, 0, {
+      id: "notify",
+      label: "Email-уведомления",
+      done: notifyConfigured,
+      section: "notifications",
+    });
+  }
+
+  return tasks;
 }
 
 export function profileCompletionPercent(tasks: ProfileCompletionTask[]): number {

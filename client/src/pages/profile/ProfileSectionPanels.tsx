@@ -1,14 +1,17 @@
+import type { CloudProfileMeta } from "../../lib/profileCloudPayload";
+import type { CloudSyncState } from "../../lib/profileCloudSync";
 import type { AuthUserDto } from "../../api";
 import type { UserProfilePrefs } from "../../lib/profilePrefs";
 import type { VisitedRoomEntry } from "../../lib/roomLobbyPrefs";
 import type { ProfileDesign } from "./profileDesign";
 import type { ProfileSectionId } from "./profileHubTheme";
-import { PROFILE_NAV } from "./profileHubTheme";
 import { ProfileRoomPanel } from "./ProfileRoomPanel";
 import { ProfileDangerPanel } from "./panels/ProfileDangerPanel";
-import { ProfileRoadmapPanel } from "./panels/ProfileRoadmapPanel";
+import { ProfileBillingPanel } from "./panels/ProfileBillingPanel";
+import { ProfileOrganizationPanel } from "./panels/ProfileOrganizationPanel";
 import { ProfileIdentityPanel } from "./panels/ProfileIdentityPanel";
 import { ProfileLobbyPanel } from "./panels/ProfileLobbyPanel";
+import { ProfileNotificationsPanel } from "./panels/ProfileNotificationsPanel";
 import { ProfileNotepadPanel } from "./panels/ProfileNotepadPanel";
 import { ProfileOverviewPanel } from "./panels/ProfileOverviewPanel";
 import { ProfileSecurityPanel } from "./panels/ProfileSecurityPanel";
@@ -29,6 +32,12 @@ export type ProfilePanelsProps = {
   onGoSection: (id: ProfileSectionId) => void;
   onExportBackup: () => void;
   onImportBackup: (file: File | undefined) => void;
+  cloudSyncLabel?: string | null;
+  cloudSyncState?: CloudSyncState;
+  cloudSyncMeta?: CloudProfileMeta;
+  onRetryCloudSync?: () => void;
+  avatarSrc?: string | null;
+  wallpaperSrc?: string | null;
 };
 
 export function ProfileSectionPanels({
@@ -46,6 +55,12 @@ export function ProfileSectionPanels({
   onGoSection,
   onExportBackup,
   onImportBackup,
+  cloudSyncLabel,
+  cloudSyncState,
+  cloudSyncMeta,
+  onRetryCloudSync,
+  avatarSrc,
+  wallpaperSrc,
 }: ProfilePanelsProps) {
   if (section === "overview") {
     return (
@@ -62,7 +77,17 @@ export function ProfileSectionPanels({
   }
 
   if (section === "identity") {
-    return <ProfileIdentityPanel d={d} prefs={prefs} setPrefs={setPrefs} authUser={authUser} />;
+    return (
+      <ProfileIdentityPanel
+        d={d}
+        prefs={prefs}
+        setPrefs={setPrefs}
+        authUser={authUser}
+        onGoSection={onGoSection}
+        cloudSyncLabel={cloudSyncLabel}
+        avatarSrc={avatarSrc}
+      />
+    );
   }
 
   if (section === "room") {
@@ -73,7 +98,8 @@ export function ProfileSectionPanels({
           prefs={prefs}
           setPrefs={setPrefs}
           onWallpaperFile={onWallpaperFile}
-          onWallpaperClear={() => setPrefs({ ...prefs, wallpaperDataUrl: null })}
+          onWallpaperClear={() => setPrefs({ ...prefs, wallpaperDataUrl: null, wallpaperMediaPath: null })}
+          wallpaperSrc={wallpaperSrc}
         />
       </ProfileSectionFrame>
     );
@@ -89,6 +115,18 @@ export function ProfileSectionPanels({
     return <ProfileNotepadPanel d={d} prefs={prefs} setPrefs={setPrefs} />;
   }
 
+  if (section === "notifications") {
+    return (
+      <ProfileNotificationsPanel
+        d={d}
+        prefs={prefs}
+        setPrefs={setPrefs}
+        authUser={authUser}
+        onGoSection={onGoSection}
+      />
+    );
+  }
+
   if (section === "security") {
     return (
       <ProfileSecurityPanel
@@ -97,6 +135,10 @@ export function ProfileSectionPanels({
         onLogout={onLogout}
         onExportBackup={onExportBackup}
         onImportBackup={onImportBackup}
+        cloudSyncLabel={cloudSyncLabel}
+        cloudSyncState={cloudSyncState}
+        cloudSyncMeta={cloudSyncMeta}
+        onRetryCloudSync={onRetryCloudSync}
       />
     );
   }
@@ -105,9 +147,12 @@ export function ProfileSectionPanels({
     return <ProfileDangerPanel d={d} onGoSection={onGoSection} />;
   }
 
-  const roadmapMeta = PROFILE_NAV.find((n) => n.id === section && n.locked);
-  if (roadmapMeta) {
-    return <ProfileRoadmapPanel d={d} meta={roadmapMeta} />;
+  if (section === "organization") {
+    return <ProfileOrganizationPanel d={d} authUser={authUser} onGoSection={onGoSection} />;
+  }
+
+  if (section === "billing") {
+    return <ProfileBillingPanel d={d} onGoSection={onGoSection} />;
   }
 
   return null;

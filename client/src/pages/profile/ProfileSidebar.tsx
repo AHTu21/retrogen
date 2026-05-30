@@ -15,6 +15,7 @@ type Props = {
   favoriteCount: number;
   onGoSection: (id: ProfileSectionId) => void;
   onAvatarFile: (f: File | undefined) => void;
+  avatarSrc?: string | null;
 };
 
 function NavItem({
@@ -50,7 +51,12 @@ function NavItem({
       aria-current={active ? "page" : undefined}
     >
       {profileNavIcon(item.id)}
-      <span className="truncate">{item.label}</span>
+      <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+      {item.navBadge && !compact ? (
+        <span className={`ml-auto shrink-0 px-1.5 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-wide ${d.rFull} ${d.badgePreview}`}>
+          {item.navBadge}
+        </span>
+      ) : null}
       {item.locked ? (
         <svg className="ml-auto h-3.5 w-3.5 shrink-0 opacity-40" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
           <path d="M12 17a2 2 0 100-4 2 2 0 000 4zm0-14a5 5 0 00-5 5v3H5v4h14v-4h-2v-3a5 5 0 00-5-5z" />
@@ -126,6 +132,7 @@ export function ProfileSidebar({
   favoriteCount,
   onGoSection,
   onAvatarFile,
+  avatarSrc,
 }: Props) {
   return (
     <aside className={d.sidebar} aria-label="Навигация настроек">
@@ -137,6 +144,7 @@ export function ProfileSidebar({
           visitedCount={visitedCount}
           favoriteCount={favoriteCount}
           onAvatarFile={onAvatarFile}
+          avatarSrc={avatarSrc}
           compact
         />
         <SidebarNav d={d} section={section} navItems={navItems} onGoSection={onGoSection} compact />
@@ -150,6 +158,7 @@ export function ProfileSidebar({
           visitedCount={visitedCount}
           favoriteCount={favoriteCount}
           onAvatarFile={onAvatarFile}
+          avatarSrc={avatarSrc}
         />
         <SidebarNav d={d} section={section} navItems={navItems} onGoSection={onGoSection} />
       </div>

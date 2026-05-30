@@ -1,6 +1,11 @@
 import type { CSSProperties } from "react";
 import { MAX_AVATAR_DATA_URL_CHARS } from "./messengerAvatar";
 
+/**
+ * Оформление панели профиля в мессенджере — отдельно от `profilePrefs` (`retrogen_profile_v1`).
+ * Ключ: `retrogen_messenger_profile_appearance_v1`. Не синхронизируется с `/profile` и комнатой.
+ * Identity (имя, аватар, «О себе») — всегда из `profilePrefs` + `useProfilePrefsDraft`.
+ */
 const KEY = "retrogen_messenger_profile_appearance_v1";
 
 export type MessengerBasicGradient = "g1" | "g2" | "g3" | "g4" | "g5";

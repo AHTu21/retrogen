@@ -27,10 +27,11 @@ type Props = {
   setPrefs: React.Dispatch<React.SetStateAction<UserProfilePrefs>>;
   onWallpaperFile: (f: File | undefined) => void;
   onWallpaperClear: () => void;
+  wallpaperSrc?: string | null;
 };
 
-export function ProfileRoomPanel({ d, prefs, setPrefs, onWallpaperFile, onWallpaperClear }: Props) {
-  const hasWallpaper = !!effectiveBoardWallpaper(prefs);
+export function ProfileRoomPanel({ d, prefs, setPrefs, onWallpaperFile, onWallpaperClear, wallpaperSrc }: Props) {
+  const hasWallpaper = !!(wallpaperSrc ?? effectiveBoardWallpaper(prefs));
 
   const applyTheme = (preset: RoomThemePreset) => {
     setPrefs((p) => ({
@@ -48,7 +49,7 @@ export function ProfileRoomPanel({ d, prefs, setPrefs, onWallpaperFile, onWallpa
   return (
     <div className="flex min-w-0 max-w-full flex-col gap-8 overflow-x-clip">
       <RoomStyleResetBar d={d} onReset={resetRoomStyle} />
-      <RoomLivePreview d={d} prefs={prefs} />
+      <RoomLivePreview d={d} prefs={prefs} wallpaperSrc={wallpaperSrc} />
 
       <RoomQuickThemes
         d={d}

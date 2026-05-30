@@ -4,6 +4,11 @@ import {
   normalizeProfileAccent,
 } from "./profileAccent";
 import {
+  DEFAULT_PROFILE_NOTIFICATIONS,
+  normalizeProfileNotifications,
+  type ProfileEmailNotifications,
+} from "./profileNotificationPrefs";
+import {
   DEFAULT_BOARD_BACKDROP,
   DEFAULT_HEADER_TINT,
   normalizeBoardBackdropColor,
@@ -84,12 +89,18 @@ export type UserProfilePrefs = {
   profileAccent: string;
   /** Фото профиля (отдельно от обоев доски) */
   avatarDataUrl: string | null;
+  /** API-путь облачного аватара (Bearer GET) */
+  avatarMediaPath: string | null;
   /** Обои поверх фона комнаты /r/… */
   wallpaperDataUrl: string | null;
+  /** API-путь облачных обоев */
+  wallpaperMediaPath: string | null;
   /** 0–100: прозрачность слоя обоев на доске */
   wallpaperOpacity: number;
   /** Эмодзи-статус в мессенджере и профиле */
   emojiStatus: string;
+  /** Email-уведомления (локально до серверной рассылки) */
+  notifications: ProfileEmailNotifications;
 };
 
 const defaultPrefs: UserProfilePrefs = {
@@ -113,9 +124,12 @@ const defaultPrefs: UserProfilePrefs = {
   cursorStyle: "default",
   profileAccent: DEFAULT_PROFILE_ACCENT,
   avatarDataUrl: null,
+  avatarMediaPath: null,
   wallpaperDataUrl: null,
+  wallpaperMediaPath: null,
   wallpaperOpacity: DEFAULT_WALLPAPER_OPACITY,
   emojiStatus: "",
+  notifications: { ...DEFAULT_PROFILE_NOTIFICATIONS },
 };
 
 const DATA_IMAGE_RE = /^data:image\//i;
@@ -164,7 +178,16 @@ function sanitizeProfilePrefs(p: UserProfilePrefs): UserProfilePrefs {
   const wallpaperOpacity = normalizeWallpaperOpacity(p.wallpaperOpacity);
   const emojiStatus = typeof p.emojiStatus === "string" ? p.emojiStatus.trim().slice(0, 8) : "";
 
-  return { ...p, avatarDataUrl, wallpaperDataUrl, boardBackdrop, headerTint, wallpaperOpacity, emojiStatus };
+  return {
+    ...p,
+    avatarDataUrl,
+    wallpaperDataUrl,
+    boardBackdrop,
+    headerTint,
+    wallpaperOpacity,
+    emojiStatus,
+    notifications: normalizeProfileNotifications(p.notifications),
+  };
 }
 
 export function loadProfilePrefs(): UserProfilePrefs {
@@ -208,9 +231,13 @@ export function loadProfilePrefs(): UserProfilePrefs {
         return norm === LEGACY_PROFILE_ACCENT ? DEFAULT_PROFILE_ACCENT : norm;
       })(),
       avatarDataUrl: typeof p.avatarDataUrl === "string" ? p.avatarDataUrl : null,
+      avatarMediaPath: typeof p.avatarMediaPath === "string" ? p.avatarMediaPath.trim().slice(0, 120) || null : null,
       wallpaperDataUrl: typeof p.wallpaperDataUrl === "string" ? p.wallpaperDataUrl : null,
+      wallpaperMediaPath:
+        typeof p.wallpaperMediaPath === "string" ? p.wallpaperMediaPath.trim().slice(0, 120) || null : null,
       wallpaperOpacity: normalizeWallpaperOpacity(p.wallpaperOpacity),
       emojiStatus: typeof p.emojiStatus === "string" ? p.emojiStatus.trim().slice(0, 8) : "",
+      notifications: normalizeProfileNotifications(p.notifications),
     };
     const sanitized = sanitizeProfilePrefs(loaded);
     if (JSON.stringify(sanitized) !== JSON.stringify(loaded)) {

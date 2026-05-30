@@ -9,6 +9,7 @@ import { userCanFacilitateBySlug } from "./roomsAcl.js";
 import { sanitizeTheme } from "./lib/sanitizeTheme.js";
 import { roomAccessStatus } from "./roomAccess.js";
 import { registerChatRoutes } from "./chat/chatRoutes.js";
+import { notifyRetroEndedBySlug } from "./notifications/retroEndedEmail.js";
 import {
   createRoom,
   createCard,
@@ -453,6 +454,7 @@ export async function registerRoutes(app: FastifyInstance, io: Server) {
     if (dto.listedInLobby) {
       io.to("lobby").emit("lobby:patch", { type: "room.updated", room: lobbySnippetFromRoomDto(dto) });
     }
+    void notifyRetroEndedBySlug(req.params.slug, authUser?.id ?? null);
     return dto;
   });
 

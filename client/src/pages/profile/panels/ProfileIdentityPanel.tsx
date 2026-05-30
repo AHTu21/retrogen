@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useMemo } from "react";
 import type { AuthUserDto } from "../../../api";
 import {
@@ -13,6 +14,7 @@ import { validateTelegram, validateWebsite } from "../../../lib/profileIdentityV
 import type { UserProfilePrefs } from "../../../lib/profilePrefs";
 import { ProfileEmojiStatusField } from "../ProfileEmojiStatusField";
 import type { ProfileDesign } from "../profileDesign";
+import type { ProfileSectionId } from "../profileHubTheme";
 import {
   PROFILE_PRONOUN_PRESETS,
   PROFILE_ROLE_SUGGESTIONS,
@@ -34,6 +36,9 @@ type Props = {
   prefs: UserProfilePrefs;
   setPrefs: React.Dispatch<React.SetStateAction<UserProfilePrefs>>;
   authUser: AuthUserDto | null;
+  onGoSection: (id: ProfileSectionId) => void;
+  avatarSrc?: string | null;
+  cloudSyncLabel?: string | null;
 };
 
 function normalizeTelegram(raw: string) {
@@ -51,11 +56,14 @@ function IdentityPreview({
   d,
   prefs,
   authUser,
+  avatarSrc,
 }: {
   d: ProfileDesign;
   prefs: UserProfilePrefs;
   authUser: AuthUserDto | null;
+  avatarSrc?: string | null;
 }) {
+  const displayAvatar = avatarSrc ?? prefs.avatarDataUrl;
   const roleLine = [prefs.roleTitle.trim(), prefs.teamName.trim()].filter(Boolean).join(" · ");
   const locationLine = [prefs.city.trim(), prefs.timezone.trim() ? timezoneLabel(prefs.timezone) : ""]
     .filter(Boolean)
@@ -68,8 +76,8 @@ function IdentityPreview({
         <div
           className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--ph-surface-elevated)] text-sm font-semibold text-[var(--ph-muted)] ring-1 ring-[var(--ph-border)]`}
         >
-          {prefs.avatarDataUrl ? (
-            <img src={prefs.avatarDataUrl} alt="" className="h-full w-full object-cover" />
+          {displayAvatar ? (
+            <img src={displayAvatar} alt="" className="h-full w-full object-cover" />
           ) : (
             initials(prefs, authUser)
           )}
@@ -103,7 +111,7 @@ function FieldError({ message }: { message: string | null }) {
   return <p className="mt-1 text-[0.75rem] text-amber-700 dark:text-amber-300">{message}</p>;
 }
 
-export function ProfileIdentityPanel({ d, prefs, setPrefs, authUser }: Props) {
+export function ProfileIdentityPanel({ d, prefs, setPrefs, authUser, onGoSection, cloudSyncLabel, avatarSrc }: Props) {
   const roleListId = "profile-role-suggestions";
   const telegramError = useMemo(() => validateTelegram(prefs.telegram), [prefs.telegram]);
   const websiteError = useMemo(() => validateWebsite(prefs.website), [prefs.website]);
@@ -114,7 +122,21 @@ export function ProfileIdentityPanel({ d, prefs, setPrefs, authUser }: Props) {
         Единая карточка для комнаты и мессенджера: имя, статус, контакты и «О себе». Фото — в карточке слева.
       </p>
 
-      <IdentityPreview d={d} prefs={prefs} authUser={authUser} />
+      {!authUser ? (
+        <p className={`${d.noticeBanner} px-4 py-3 text-[0.875rem] ${d.rSm}`}>
+          Гостевой режим — данные только в этом браузере.{" "}
+          <Link to="/login" className={d.link}>
+            Войдите
+          </Link>
+          , чтобы синхронизировать профиль между устройствами.
+        </p>
+      ) : cloudSyncLabel ? (
+        <p className={`${d.noticeInfo} px-4 py-3 text-[0.8125rem] leading-relaxed ${d.rSm}`}>
+          <span className="font-medium">Облако:</span> {cloudSyncLabel}. Текстовые настройки и уведомления — на сервере; аватар и обои загружаются отдельно после входа.
+        </p>
+      ) : null}
+
+        <IdentityPreview d={d} prefs={prefs} authUser={authUser} avatarSrc={avatarSrc} />
 
       {authUser ? (
         <ProfileCard d={d} title="Аккаунт">
@@ -135,6 +157,15 @@ export function ProfileIdentityPanel({ d, prefs, setPrefs, authUser }: Props) {
               }
             />
           </ProfileField>
+          <div className={`flex flex-col gap-3 border-t px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:py-4 ${d.insetRow}`}>
+            <div className="min-w-0">
+              <p className="text-[0.8125rem] font-medium text-[var(--ph-text)]">Email-уведомления</p>
+              <p className={`mt-0.5 text-[0.75rem] ${d.muted}`}>Завершение ретро, дайджест и новости продукта</p>
+            </div>
+            <button type="button" className={`${d.btnSecondary} shrink-0`} onClick={() => onGoSection("notifications")}>
+              Настроить
+            </button>
+          </div>
         </ProfileCard>
       ) : null}
 

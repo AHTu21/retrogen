@@ -17,6 +17,8 @@ model User {
   email        String     @unique
   passwordHash String
   displayName  String     @default("")
+  /** Cloud-synced profile subset (v1 JSON, без avatar/wallpaper data URL) */
+  profileJson  Json?
   globalRole   GlobalRole @default(user)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt

@@ -449,6 +449,109 @@ export async function updateAuthDisplayName(displayName: string): Promise<AuthUs
   return data.user;
 }
 
+export type CloudProfileV1Dto = {
+  v: 1;
+  updatedAt: string;
+  identity: {
+    displayName: string;
+    profileEmail: string;
+    signature: string;
+    roleTitle: string;
+    teamName: string;
+    pronouns: string;
+    city: string;
+    timezone: string;
+    telegram: string;
+    website: string;
+    contact: string;
+    emojiStatus: string;
+  };
+  notepad: string;
+  room: {
+    boardBackdrop: string;
+    headerTint: string;
+    cursorStyle: string;
+    wallpaperOpacity: number;
+    profileAccent: string;
+  };
+  notifications: {
+    retroEnded: boolean;
+    weeklyDigest: boolean;
+    productUpdates: boolean;
+  };
+  media?: {
+    avatarPath: string | null;
+    wallpaperPath: string | null;
+  };
+};
+
+export type CloudProfilePatchDto = {
+  identity?: Partial<CloudProfileV1Dto["identity"]>;
+  notepad?: string;
+  room?: Partial<CloudProfileV1Dto["room"]>;
+  notifications?: Partial<CloudProfileV1Dto["notifications"]>;
+  media?: Partial<NonNullable<CloudProfileV1Dto["media"]>>;
+};
+
+export type AuthProfileFetchResult =
+  | { status: "ok"; profile: CloudProfileV1Dto | null }
+  | { status: "unauthorized" }
+  | { status: "unavailable" };
+
+export async function fetchAuthProfile(): Promise<AuthProfileFetchResult> {
+  try {
+    const res = await apiFetch("/api/auth/me/profile");
+    if (res.status === 401) return { status: "unauthorized" };
+    if (!res.ok) return { status: "unavailable" };
+    const data = (await res.json()) as { profile: CloudProfileV1Dto | null };
+    return { status: "ok", profile: data.profile ?? null };
+  } catch {
+    return { status: "unavailable" };
+  }
+}
+
+export async function patchAuthProfile(
+  patch: CloudProfilePatchDto,
+): Promise<{ profile: CloudProfileV1Dto | null; user: AuthUserDto }> {
+  const res = await apiFetch("/api/auth/me/profile", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? res.statusText);
+  }
+  return res.json() as Promise<{ profile: CloudProfileV1Dto | null; user: AuthUserDto }>;
+}
+
+export type ProfileMediaKind = "avatar" | "wallpaper";
+
+export async function uploadProfileMedia(
+  kind: ProfileMediaKind,
+  file: File,
+): Promise<{ kind: ProfileMediaKind; path: string; profile: CloudProfileV1Dto | null; user: AuthUserDto }> {
+  const fd = new FormData();
+  fd.append("kind", kind);
+  fd.append("file", file);
+  const res = await apiFetch("/api/auth/me/profile/media", { method: "POST", body: fd });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? res.statusText);
+  }
+  return res.json() as Promise<{
+    kind: ProfileMediaKind;
+    path: string;
+    profile: CloudProfileV1Dto | null;
+    user: AuthUserDto;
+  }>;
+}
+
+export async function deleteProfileMedia(kind: ProfileMediaKind): Promise<void> {
+  const res = await apiFetch(`/api/auth/me/profile/media/${kind}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("media_delete_failed");
+}
+
 export async function forwardMessageToSaved(
   chatId: string,
   messageId: string,

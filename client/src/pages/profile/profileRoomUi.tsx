@@ -89,14 +89,17 @@ export function SettingColorGroup({ d, title, hint, value, presets, normalize, o
 export function RoomLivePreview({
   d,
   prefs,
+  wallpaperSrc,
 }: {
   d: ProfileDesign;
   prefs: Pick<
     UserProfilePrefs,
     "boardBackdrop" | "headerTint" | "cursorStyle" | "wallpaperDataUrl" | "avatarDataUrl" | "wallpaperOpacity"
   >;
+  wallpaperSrc?: string | null;
 }) {
-  const hasWallpaper = !!effectiveBoardWallpaper(prefs);
+  const resolvedWallpaper = wallpaperSrc ?? effectiveBoardWallpaper(prefs);
+  const hasWallpaper = !!resolvedWallpaper;
   const contrastHint = roomPaletteContrastHint(prefs.boardBackdrop, prefs.headerTint);
 
   return (
@@ -138,7 +141,7 @@ export function RoomLivePreview({
           boardBackdrop={prefs.boardBackdrop}
           headerTint={prefs.headerTint}
           cursorStyle={prefs.cursorStyle}
-          wallpaperDataUrl={prefs.wallpaperDataUrl}
+          wallpaperDataUrl={resolvedWallpaper}
           avatarDataUrl={prefs.avatarDataUrl}
           wallpaperOpacity={prefs.wallpaperOpacity}
         />
