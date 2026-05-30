@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { useSettingsHubOptional } from "../settings";
 
 export type RetrogenOverflowMenuProps = {
   isLight: boolean;
@@ -13,6 +14,8 @@ export type RetrogenOverflowMenuProps = {
   extraItems?: ReactNode;
   /** Ссылка «Команда» для страницы настройки состава комнаты (обычно только фасилитатор) */
   teamRoomSlug?: string | null;
+  /** Явный обработчик «Настройки»; иначе — глобальный Settings Hub или fallback /profile#room */
+  onOpenSettings?: () => void;
 };
 
 function menuShell(isLight: boolean) {
@@ -35,9 +38,24 @@ export function RetrogenOverflowMenu({
   showLobbyLink = true,
   extraItems,
   teamRoomSlug,
+  onOpenSettings,
 }: RetrogenOverflowMenuProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const settingsHub = useSettingsHubOptional();
+
+  const openSettings = () => {
+    setOpen(false);
+    if (onOpenSettings) {
+      onOpenSettings();
+      return;
+    }
+    if (settingsHub) {
+      settingsHub.open();
+      return;
+    }
+    window.location.assign("/profile#room");
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -81,9 +99,9 @@ export function RetrogenOverflowMenu({
           <Link to="/profile" role="menuitem" className={itemClass(isLight)} onClick={() => setOpen(false)}>
             Профиль
           </Link>
-          <Link to="/profile#room" role="menuitem" className={itemClass(isLight)} onClick={() => setOpen(false)}>
+          <button type="button" role="menuitem" className={btnItemClass(isLight)} onClick={openSettings}>
             Настройки
-          </Link>
+          </button>
           <Link to="/workshop" role="menuitem" className={itemClass(isLight)} onClick={() => setOpen(false)}>
             Мастерская
           </Link>
