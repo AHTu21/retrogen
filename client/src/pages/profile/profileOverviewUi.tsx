@@ -184,11 +184,20 @@ export function buildOverviewHubItems(
           {
             id: "organization",
             label: "Организация",
-            value: "Preview",
-            metric: "Team+ и SSO",
-            action: "Корпоративные возможности",
+            value: "Не подключена",
+            metric: "корпоративный аккаунт",
+            action: "Team+ и SSO",
             icon: profileNavIcon("organization"),
             section: "organization" as ProfileSectionId,
+          },
+          {
+            id: "billing",
+            label: "Тариф",
+            value: "Бесплатный",
+            metric: "текущий план",
+            action: "Сравнить планы",
+            icon: profileNavIcon("billing"),
+            section: "billing" as ProfileSectionId,
           },
         ]
       : []),

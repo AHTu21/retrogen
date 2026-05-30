@@ -21,7 +21,7 @@ export function ProfileBillingPanel({ d, onGoSection }: Props) {
           d={d}
           eyebrow="Тариф"
           title="Планы и модули"
-          lead="Сравнение тарифов и будущих модулей IAM, AI и ARCH. Оплата и апгрейд появятся в профиле без смены URL."
+          lead="Сравнение тарифов и будущих модулей IAM, AI и ARCH. Оплата и апгрейд появятся здесь, без смены URL."
           icon="💳"
         />
 
@@ -33,8 +33,12 @@ export function ProfileBillingPanel({ d, onGoSection }: Props) {
             <strong className="font-semibold">IAM</strong> — роли и политики доступа;{" "}
             <strong className="font-semibold">AI</strong> — помощник фасилитатора;{" "}
             <strong className="font-semibold">ARCH</strong> — архив и compliance. Пока все базовые функции
-            Retrogen бесплатны. Корпоративный GDPR-экспорт — в{" "}
-            <button type="button" className="font-medium underline underline-offset-2" onClick={() => onGoSection("danger")}>
+            Retrogen бесплатны. Организация и SSO — в разделе{" "}
+            <button type="button" className={d.link} onClick={() => onGoSection("organization")}>
+              Организация
+            </button>
+            ; GDPR-экспорт — в{" "}
+            <button type="button" className={d.link} onClick={() => onGoSection("danger")}>
               опасной зоне
             </button>
             .

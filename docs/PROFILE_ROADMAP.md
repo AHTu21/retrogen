@@ -111,6 +111,5 @@ components/room/           — UI комнаты, связанный с проф
 
 | Версия | Содержание |
 |--------|------------|
-| 0.15.0 | Foundation: completion, emoji, lobby events, roadmap |
-| 0.16.0 | Room identity bridge (Фаза A) |
-| 0.17.0 | useProfilePrefsDraft в ProfilePage + messenger (Фаза B) |
+| 0.15.0 | Foundation: completion, emoji, lobby events |
+| 0.16.0 | Notifications MVP, org/billing preview, room identity bridge, useProfilePrefsDraft |

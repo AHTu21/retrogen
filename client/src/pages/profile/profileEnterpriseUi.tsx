@@ -61,8 +61,8 @@ export function EnterpriseFeatureGrid({ d, features }: { d: ProfileDesign; featu
   return (
     <section className="space-y-2">
       <div className="px-0.5">
-        <h2 className={d.groupTitle}>В roadmap</h2>
-        <p className={d.groupDesc}>Функции корпоративного тарифа — интерфейс готовится параллельно с backend</p>
+        <h2 className={d.groupTitle}>Запланировано</h2>
+        <p className={d.groupDesc}>Корпоративные функции — интерфейс готовится параллельно с backend</p>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         {features.map((f) => (
@@ -92,9 +92,9 @@ function EnterpriseStatusBadge({
   status: EnterpriseFeature["status"];
 }) {
   const label =
-    status === "available" ? "Доступно" : status === "enterprise" ? "Enterprise" : "Скоро";
+    status === "available" ? "Доступно" : status === "enterprise" ? "Корпоративный" : "Скоро";
   const cls =
-    status === "available" ? d.badgeLive : status === "enterprise" ? d.badgeDone : d.badgeDone;
+    status === "available" ? d.badgeLive : status === "enterprise" ? d.badgePreview : d.badgeDone;
   return (
     <span className={`px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide ${d.rFull} ${cls}`}>
       {label}
@@ -107,7 +107,7 @@ export function BillingTierGrid({ d, tiers }: { d: ProfileDesign; tiers: Billing
     <section className="space-y-2">
       <div className="px-0.5">
         <h2 className={d.groupTitle}>Тарифные планы</h2>
-        <p className={d.groupDesc}>Сейчас все функции Retrogen доступны в бесплатном режиме для команд</p>
+        <p className={d.groupDesc}>Сейчас все функции Retrogen доступны бесплатно для команд</p>
       </div>
       <div className="grid gap-3 lg:grid-cols-3">
         {tiers.map((tier) => (
@@ -172,8 +172,8 @@ export const ORG_ENTERPRISE_FEATURES: EnterpriseFeature[] = [
   {
     id: "white-label",
     icon: "🏢",
-    title: "White-label",
-    description: "Брендинг под заказчика (ВТБ, МТС и др.) — логотип, домен, палитра.",
+    title: "Свой бренд (white-label)",
+    description: "Логотип, домен и палитра под заказчика — для крупных команд.",
     status: "enterprise",
   },
   {
@@ -188,7 +188,7 @@ export const ORG_ENTERPRISE_FEATURES: EnterpriseFeature[] = [
 export const BILLING_TIERS: BillingTier[] = [
   {
     id: "free",
-    name: "Free",
+    name: "Бесплатный",
     price: "0 ₽",
     description: "Для небольших команд и пилотных ретро.",
     current: true,
@@ -196,7 +196,7 @@ export const BILLING_TIERS: BillingTier[] = [
   },
   {
     id: "team",
-    name: "Team",
+    name: "Команда",
     price: "По запросу",
     description: "SSO, общее лобби организации и расширенная аналитика.",
     badge: "Скоро",
@@ -204,10 +204,10 @@ export const BILLING_TIERS: BillingTier[] = [
   },
   {
     id: "enterprise",
-    name: "Enterprise",
-    price: "Individual",
+    name: "Корпоративный",
+    price: "По договору",
     description: "White-label, IAM, AI-модули и выделенный контур.",
-    badge: "Enterprise",
+    badge: "Корпоративный",
     highlights: ["Модули IAM · AI · ARCH", "On-prem / VPC", "SLA и выделенный CSM", "Кастомные интеграции"],
   },
 ];

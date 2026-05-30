@@ -50,9 +50,9 @@ function NavItem({
       aria-current={active ? "page" : undefined}
     >
       {profileNavIcon(item.id)}
-      <span className="min-w-0 truncate">{item.label}</span>
-      {item.navBadge ? (
-        <span className={`ml-auto shrink-0 px-1.5 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-wide ${d.rFull} ${d.badgeDone}`}>
+      <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+      {item.navBadge && !compact ? (
+        <span className={`ml-auto shrink-0 px-1.5 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-wide ${d.rFull} ${d.badgePreview}`}>
           {item.navBadge}
         </span>
       ) : null}

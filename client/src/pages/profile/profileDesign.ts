@@ -50,6 +50,7 @@ export type ProfileDesign = {
   noticeBanner: string;
   badgeLive: string;
   badgeDone: string;
+  badgePreview: string;
   statTile: string;
   savePill: string;
   savePillActive: string;
@@ -165,6 +166,8 @@ export function createProfileDesign(isLight: boolean, isRounded: boolean): Profi
     badgeLive: isLight ? "bg-emerald-500/12 text-emerald-800" : "bg-emerald-400/15 text-emerald-300",
 
     badgeDone: isLight ? "bg-black/5 text-[var(--ph-muted)]" : "bg-white/8 text-[var(--ph-muted)]",
+
+    badgePreview: isLight ? "bg-sky-500/10 text-sky-800" : "bg-sky-400/12 text-sky-300",
 
     statTile: `${rSm} bg-[var(--ph-surface)] px-4 py-3.5 ring-1 ring-[var(--ph-border)]`,
 

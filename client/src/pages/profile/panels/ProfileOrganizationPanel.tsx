@@ -26,7 +26,7 @@ export function ProfileOrganizationPanel({ d, authUser, onGoSection }: Props) {
           d={d}
           eyebrow="Корпоратив"
           title="Организация"
-          lead="Предпросмотр Team+ и enterprise-функций. Сейчас вы работаете как индивидуальный участник с локальным профилем."
+          lead="Предпросмотр Team+ и корпоративных функций. Сейчас вы работаете как индивидуальный участник с локальным профилем."
           icon="🏢"
         />
 
@@ -52,16 +52,20 @@ export function ProfileOrganizationPanel({ d, authUser, onGoSection }: Props) {
           <p className="font-medium">Что можно настроить уже сейчас</p>
           <p className="mt-1 opacity-90">
             Профиль, уведомления и резервная копия JSON — в разделах{" "}
-            <button type="button" className="font-medium underline underline-offset-2" onClick={() => onGoSection("identity")}>
+            <button type="button" className={d.link} onClick={() => onGoSection("identity")}>
               Личные данные
             </button>
             ,{" "}
-            <button type="button" className="font-medium underline underline-offset-2" onClick={() => onGoSection("notifications")}>
+            <button type="button" className={d.link} onClick={() => onGoSection("notifications")}>
               Уведомления
             </button>{" "}
             и{" "}
-            <button type="button" className="font-medium underline underline-offset-2" onClick={() => onGoSection("security")}>
+            <button type="button" className={d.link} onClick={() => onGoSection("security")}>
               Безопасность
+            </button>
+            . Тарифы — в разделе{" "}
+            <button type="button" className={d.link} onClick={() => onGoSection("billing")}>
+              Тариф
             </button>
             .
           </p>
