@@ -5,7 +5,10 @@ import { RetrogenDockableHelpRoot, RetrogenDockableHelpToggle } from "../compone
 import { RetrogenOverflowMenu } from "../components/RetrogenOverflowMenu";
 import { MessengerNavIconButton } from "../components/MessengerNavIconButton";
 import { ThemeCornersIconButtons } from "../components/ThemeCornersIconButtons";
-import { fetchAuthMe, logoutAccount, type AuthUserDto } from "../api";
+import { fetchAuthMe, logoutAccount, uploadProfileMedia, type AuthUserDto } from "../api";
+import { seedProfileMediaCache } from "../lib/profileMediaCache";
+import { useProfileMediaDisplay } from "../lib/useProfileMediaDisplay";
+import { ProfileCloudConflictBanner } from "./profile/ProfileCloudConflictBanner";
 import { applyProfileBackup, downloadProfileBackup, parseProfileBackup } from "../lib/profileBackup";
 import { profileAccentCssVars } from "../lib/profileAccent";
 import { MAX_WALLPAPER_CHARS, type UserProfilePrefs } from "../lib/profilePrefs";
@@ -59,7 +62,7 @@ export function ProfilePage() {
     },
   });
 
-  const { cloudSyncLabel, cloudSyncState, cloudSyncMeta, scheduleCloudPush, retryCloudSync } =
+  const { cloudSyncLabel, cloudSyncState, cloudSyncMeta, scheduleCloudPush, retryCloudSync, cloudConflict, resolveCloudConflict } =
     useProfileCloudSync({
       authUser,
       prefs,
@@ -72,6 +75,8 @@ export function ProfilePage() {
     });
 
   scheduleCloudPushRef.current = scheduleCloudPush;
+
+  const { avatarSrc, wallpaperSrc } = useProfileMediaDisplay(prefs);
 
   const accentStyle = useMemo(
     () => profileAccentCssVars(prefs.profileAccent, isLight),
@@ -209,6 +214,35 @@ export function ProfilePage() {
   }
 
   function onAvatarFile(f: File | undefined) {
+    if (!f) return;
+    if (!f.type.startsWith("image/")) {
+      window.alert("Выберите файл изображения.");
+      return;
+    }
+    if (authUser) {
+      void uploadProfileMedia("avatar", f)
+        .then((res) => {
+          readImageFile(f, (url) => {
+            if (url) seedProfileMediaCache(res.path, url);
+          });
+          const next = {
+            ...prefs,
+            avatarDataUrl: null,
+            avatarMediaPath: res.path,
+          };
+          setPrefs(next);
+          commit(next);
+          setAuthUser(res.user);
+        })
+        .catch(() => {
+          readImageFile(f, (url) => {
+            const next = { ...prefs, avatarDataUrl: url, avatarMediaPath: null };
+            setPrefs(next);
+            commit(next);
+          });
+        });
+      return;
+    }
     readImageFile(f, (url) => {
       const next = { ...prefs, avatarDataUrl: url };
       setPrefs(next);
@@ -217,6 +251,34 @@ export function ProfilePage() {
   }
 
   function onWallpaperFile(f: File | undefined) {
+    if (!f) return;
+    if (!f.type.startsWith("image/")) {
+      window.alert("Выберите файл изображения.");
+      return;
+    }
+    if (authUser) {
+      void uploadProfileMedia("wallpaper", f)
+        .then((res) => {
+          readImageFile(f, (url) => {
+            if (url) seedProfileMediaCache(res.path, url);
+          });
+          const next = {
+            ...prefs,
+            wallpaperDataUrl: null,
+            wallpaperMediaPath: res.path,
+          };
+          setPrefs(next);
+          commit(next);
+        })
+        .catch(() => {
+          readImageFile(f, (url) => {
+            const next = { ...prefs, wallpaperDataUrl: url, wallpaperMediaPath: null };
+            setPrefs(next);
+            commit(next);
+          });
+        });
+      return;
+    }
     readImageFile(f, (url) => {
       const next = { ...prefs, wallpaperDataUrl: url };
       setPrefs(next);
@@ -329,6 +391,16 @@ export function ProfilePage() {
             </p>
           ) : null}
 
+          {cloudConflict ? (
+            <ProfileCloudConflictBanner
+              d={d}
+              serverUpdatedAt={cloudConflict.serverUpdatedAt}
+              onKeepLocal={() => resolveCloudConflict("local")}
+              onTakeServer={() => resolveCloudConflict("server")}
+              onMerge={() => resolveCloudConflict("merge")}
+            />
+          ) : null}
+
           {saveError ? (
             <p className={`mb-4 px-4 py-3 text-[0.875rem] ${d.noticeBanner} ${d.rSm} border-amber-500/30 text-amber-900 dark:text-amber-100`}>
               {saveError}
@@ -346,6 +418,7 @@ export function ProfilePage() {
               favoriteCount={favoriteCount}
               onGoSection={goSection}
               onAvatarFile={onAvatarFile}
+              avatarSrc={avatarSrc}
             />
 
             <main className={d.detail} id="retrogen-profile-settings">
@@ -373,6 +446,8 @@ export function ProfilePage() {
                   cloudSyncState={cloudSyncState}
                   cloudSyncMeta={cloudSyncMeta}
                   onRetryCloudSync={retryCloudSync}
+                  avatarSrc={avatarSrc}
+                  wallpaperSrc={wallpaperSrc}
                 />
               </div>
             </main>

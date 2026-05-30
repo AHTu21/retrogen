@@ -89,8 +89,12 @@ export type UserProfilePrefs = {
   profileAccent: string;
   /** Фото профиля (отдельно от обоев доски) */
   avatarDataUrl: string | null;
+  /** API-путь облачного аватара (Bearer GET) */
+  avatarMediaPath: string | null;
   /** Обои поверх фона комнаты /r/… */
   wallpaperDataUrl: string | null;
+  /** API-путь облачных обоев */
+  wallpaperMediaPath: string | null;
   /** 0–100: прозрачность слоя обоев на доске */
   wallpaperOpacity: number;
   /** Эмодзи-статус в мессенджере и профиле */
@@ -120,7 +124,9 @@ const defaultPrefs: UserProfilePrefs = {
   cursorStyle: "default",
   profileAccent: DEFAULT_PROFILE_ACCENT,
   avatarDataUrl: null,
+  avatarMediaPath: null,
   wallpaperDataUrl: null,
+  wallpaperMediaPath: null,
   wallpaperOpacity: DEFAULT_WALLPAPER_OPACITY,
   emojiStatus: "",
   notifications: { ...DEFAULT_PROFILE_NOTIFICATIONS },
@@ -225,7 +231,10 @@ export function loadProfilePrefs(): UserProfilePrefs {
         return norm === LEGACY_PROFILE_ACCENT ? DEFAULT_PROFILE_ACCENT : norm;
       })(),
       avatarDataUrl: typeof p.avatarDataUrl === "string" ? p.avatarDataUrl : null,
+      avatarMediaPath: typeof p.avatarMediaPath === "string" ? p.avatarMediaPath.trim().slice(0, 120) || null : null,
       wallpaperDataUrl: typeof p.wallpaperDataUrl === "string" ? p.wallpaperDataUrl : null,
+      wallpaperMediaPath:
+        typeof p.wallpaperMediaPath === "string" ? p.wallpaperMediaPath.trim().slice(0, 120) || null : null,
       wallpaperOpacity: normalizeWallpaperOpacity(p.wallpaperOpacity),
       emojiStatus: typeof p.emojiStatus === "string" ? p.emojiStatus.trim().slice(0, 8) : "",
       notifications: normalizeProfileNotifications(p.notifications),

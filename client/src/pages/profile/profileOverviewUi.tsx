@@ -104,11 +104,12 @@ export function buildOverviewHubItems(
   visitedCount: number,
   favoriteCount: number,
 ): OverviewHubItem[] {
-  const boardValue = effectiveBoardWallpaper(prefs)
-    ? "С обоями"
-    : prefs.boardBackdrop.trim()
-      ? "Свой фон"
-      : "По умолчанию";
+  const boardValue =
+    effectiveBoardWallpaper(prefs) || prefs.wallpaperMediaPath
+      ? "С обоями"
+      : prefs.boardBackdrop.trim()
+        ? "Свой фон"
+        : "По умолчанию";
   const notepadWords = prefs.notepad.trim().split(/\s+/).filter(Boolean).length;
   const notepadValue = notepadWords ? `${notepadWords} слов` : "Пусто";
   const notifyEmail = resolveProfileNotificationEmail(prefs.profileEmail, authUser?.email ?? undefined);

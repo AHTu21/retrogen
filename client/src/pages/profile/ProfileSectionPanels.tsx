@@ -36,6 +36,8 @@ export type ProfilePanelsProps = {
   cloudSyncState?: CloudSyncState;
   cloudSyncMeta?: CloudProfileMeta;
   onRetryCloudSync?: () => void;
+  avatarSrc?: string | null;
+  wallpaperSrc?: string | null;
 };
 
 export function ProfileSectionPanels({
@@ -57,6 +59,8 @@ export function ProfileSectionPanels({
   cloudSyncState,
   cloudSyncMeta,
   onRetryCloudSync,
+  avatarSrc,
+  wallpaperSrc,
 }: ProfilePanelsProps) {
   if (section === "overview") {
     return (
@@ -81,6 +85,7 @@ export function ProfileSectionPanels({
         authUser={authUser}
         onGoSection={onGoSection}
         cloudSyncLabel={cloudSyncLabel}
+        avatarSrc={avatarSrc}
       />
     );
   }
@@ -93,7 +98,8 @@ export function ProfileSectionPanels({
           prefs={prefs}
           setPrefs={setPrefs}
           onWallpaperFile={onWallpaperFile}
-          onWallpaperClear={() => setPrefs({ ...prefs, wallpaperDataUrl: null })}
+          onWallpaperClear={() => setPrefs({ ...prefs, wallpaperDataUrl: null, wallpaperMediaPath: null })}
+          wallpaperSrc={wallpaperSrc}
         />
       </ProfileSectionFrame>
     );

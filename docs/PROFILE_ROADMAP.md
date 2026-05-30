@@ -82,12 +82,12 @@ components/room/           — UI комнаты, связанный с проф
 | `#notifications` | **MVP** — toggles в sidebar, prefs в `profilePrefs.notifications` |
 | `#organization`, `#billing` | **Preview** — UI-панели (roadmap-функции, тарифы); backend Team+ позже |
 
-### Фаза E — Cloud sync ✅ (MVP)
+### Фаза E — Cloud sync ✅
 
 - `GET/PATCH /api/auth/me/profile` — identity, notepad, room theme, notifications в `User.profileJson`
-- Клиент: `profileCloudPayload`, `profileCloudSync`, `useProfileCloudSync` в ProfilePage
-- Merge: при входе server → local (если нет грязного черновика); autosave → push debounce 900 ms
-- **Локально только:** avatar data URL, wallpaper data URL, lobby history
+- **`POST/GET/DELETE /api/auth/me/profile/media/{avatar|wallpaper}`** — файлы на сервере (`data/profile-media/`)
+- Клиент: pull/push, **conflict banner** (мои / сервер / объединить), `useProfileMediaDisplay`
+- Merge: при dirty + server newer → UI; smart merge по `updatedAt` + media paths
 
 ---
 
@@ -115,3 +115,4 @@ components/room/           — UI комнаты, связанный с проф
 | 0.15.0 | Foundation: completion, emoji, lobby events |
 | 0.16.0 | Notifications MVP, org/billing preview, room identity bridge, useProfilePrefsDraft |
 | 0.17.0 | Cloud profile sync API + identity/security polish |
+| 0.18.0 | Profile media upload + cloud conflict resolution |

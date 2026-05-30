@@ -1,5 +1,6 @@
 import type { AuthUserDto } from "../api";
 import type { UserProfilePrefs } from "./profilePrefs";
+import { resolveProfileAvatarDisplay } from "./profileMediaCache";
 import { displayHandle, displayNameWithStatus, initials } from "./profileUser";
 
 /** Снимок identity текущего участника для комнаты. */
@@ -27,8 +28,7 @@ export function resolveRoomActorLabel(prefs: UserProfilePrefs, authMe: AuthUserD
 }
 
 export function resolveRoomActorAvatar(prefs: UserProfilePrefs): string | null {
-  const url = prefs.avatarDataUrl?.trim();
-  return url || null;
+  return resolveProfileAvatarDisplay(prefs);
 }
 
 export function buildRoomActorProfile(prefs: UserProfilePrefs, authMe: AuthUserDto | null): RoomActorProfile {

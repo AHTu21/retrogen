@@ -30,6 +30,10 @@ export type CloudProfileV1 = {
     weeklyDigest: boolean;
     productUpdates: boolean;
   };
+  media: {
+    avatarPath: string | null;
+    wallpaperPath: string | null;
+  };
 };
 
 const STR = (raw: unknown, max: number) =>
@@ -74,6 +78,20 @@ function normalizeIdentity(raw: unknown): CloudProfileV1["identity"] {
   };
 }
 
+function normalizeMedia(raw: unknown): CloudProfileV1["media"] {
+  const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const path = (v: unknown) => {
+    if (typeof v !== "string") return null;
+    const t = v.trim();
+    if (!t.startsWith("/api/auth/me/profile/media/")) return null;
+    return t.slice(0, 120);
+  };
+  return {
+    avatarPath: path(o.avatarPath),
+    wallpaperPath: path(o.wallpaperPath),
+  };
+}
+
 function normalizeRoom(raw: unknown): CloudProfileV1["room"] {
   const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   return {
@@ -94,6 +112,7 @@ export function emptyCloudProfileV1(): CloudProfileV1 {
     notepad: "",
     room: normalizeRoom({}),
     notifications: normalizeNotifications({}),
+    media: normalizeMedia({}),
   };
 }
 
@@ -109,6 +128,7 @@ export function parseCloudProfileV1(raw: unknown): CloudProfileV1 | null {
     notepad: STR(o.notepad, 50_000),
     room: normalizeRoom(o.room),
     notifications: normalizeNotifications(o.notifications),
+    media: normalizeMedia(o.media),
   };
 }
 
@@ -118,6 +138,7 @@ export type CloudProfilePatch = {
   notepad?: string;
   room?: Partial<CloudProfileV1["room"]>;
   notifications?: Partial<CloudProfileV1["notifications"]>;
+  media?: Partial<CloudProfileV1["media"]>;
 };
 
 export function mergeCloudProfilePatch(current: CloudProfileV1 | null, patch: CloudProfilePatch): CloudProfileV1 {
@@ -129,6 +150,7 @@ export function mergeCloudProfilePatch(current: CloudProfileV1 | null, patch: Cl
     notepad: patch.notepad !== undefined ? STR(patch.notepad, 50_000) : base.notepad,
     room: normalizeRoom({ ...base.room, ...patch.room }),
     notifications: normalizeNotifications({ ...base.notifications, ...patch.notifications }),
+    media: normalizeMedia({ ...base.media, ...patch.media }),
   };
   return next;
 }
@@ -145,6 +167,8 @@ export function cloudProfileHasContent(p: CloudProfileV1): boolean {
     p.notepad.trim() ||
     p.room.boardBackdrop ||
     p.room.headerTint ||
+    p.media.avatarPath ||
+    p.media.wallpaperPath ||
     p.notifications.weeklyDigest ||
     p.notifications.productUpdates
   );

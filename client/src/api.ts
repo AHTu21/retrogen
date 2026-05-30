@@ -479,6 +479,10 @@ export type CloudProfileV1Dto = {
     weeklyDigest: boolean;
     productUpdates: boolean;
   };
+  media?: {
+    avatarPath: string | null;
+    wallpaperPath: string | null;
+  };
 };
 
 export type CloudProfilePatchDto = {
@@ -486,6 +490,7 @@ export type CloudProfilePatchDto = {
   notepad?: string;
   room?: Partial<CloudProfileV1Dto["room"]>;
   notifications?: Partial<CloudProfileV1Dto["notifications"]>;
+  media?: Partial<NonNullable<CloudProfileV1Dto["media"]>>;
 };
 
 export async function fetchAuthProfile(): Promise<{ profile: CloudProfileV1Dto | null } | null> {
@@ -508,6 +513,33 @@ export async function patchAuthProfile(
     throw new Error((err as { error?: string }).error ?? res.statusText);
   }
   return res.json() as Promise<{ profile: CloudProfileV1Dto | null; user: AuthUserDto }>;
+}
+
+export type ProfileMediaKind = "avatar" | "wallpaper";
+
+export async function uploadProfileMedia(
+  kind: ProfileMediaKind,
+  file: File,
+): Promise<{ kind: ProfileMediaKind; path: string; profile: CloudProfileV1Dto | null; user: AuthUserDto }> {
+  const fd = new FormData();
+  fd.append("kind", kind);
+  fd.append("file", file);
+  const res = await apiFetch("/api/auth/me/profile/media", { method: "POST", body: fd });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? res.statusText);
+  }
+  return res.json() as Promise<{
+    kind: ProfileMediaKind;
+    path: string;
+    profile: CloudProfileV1Dto | null;
+    user: AuthUserDto;
+  }>;
+}
+
+export async function deleteProfileMedia(kind: ProfileMediaKind): Promise<void> {
+  const res = await apiFetch(`/api/auth/me/profile/media/${kind}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("media_delete_failed");
 }
 
 export async function forwardMessageToSaved(

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import fs from "node:fs/promises";
 import { prisma } from "../lib/prisma.js";
 import { getJwtSecret } from "./config.js";
 import { signAccessToken, verifyAccessToken } from "./jwt.js";
@@ -7,6 +8,16 @@ import {
   parseCloudProfileV1,
   type CloudProfilePatch,
 } from "./profileJson.js";
+import {
+  deleteProfileMediaFile,
+  findProfileMediaFile,
+  MAX_PROFILE_MEDIA_BYTES,
+  mimeFromPath,
+  normalizeProfileMediaMime,
+  profileMediaApiPath,
+  saveProfileMediaFile,
+  type ProfileMediaKind,
+} from "./profileMediaStorage.js";
 import { hashPassword, verifyPassword } from "./password.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -158,5 +169,89 @@ export function registerAuthRoutes(app: FastifyInstance) {
       profile,
       user: toAuthUserDto(user),
     };
+  });
+
+  app.post("/api/auth/me/profile/media", async (req, reply) => {
+    const u = await getBearerUser(req);
+    if (!u) return reply.code(401).send({ error: "unauthorized" });
+
+    let kind: ProfileMediaKind | null = null;
+    let fileBuffer: Buffer | null = null;
+    let mime: string | null = null;
+    let filename = "image.jpg";
+
+    const parts = req.parts();
+    for await (const part of parts) {
+      if (part.type === "field" && part.fieldname === "kind") {
+        const v = String(part.value ?? "").trim();
+        if (v === "avatar" || v === "wallpaper") kind = v;
+      } else if (part.type === "file" && part.fieldname === "file") {
+        fileBuffer = await part.toBuffer();
+        filename = part.filename ?? filename;
+        mime = normalizeProfileMediaMime(part.mimetype, filename);
+      }
+    }
+
+    if (!kind || !fileBuffer || !mime) {
+      return reply.code(400).send({ error: "bad_media_upload" });
+    }
+    if (fileBuffer.length > MAX_PROFILE_MEDIA_BYTES) {
+      return reply.code(413).send({ error: "media_too_large" });
+    }
+
+    await deleteProfileMediaFile(u.id, kind);
+    const mediaPath = await saveProfileMediaFile(u.id, kind, fileBuffer, mime);
+
+    const row = await prisma.user.findUnique({
+      where: { id: u.id },
+      select: { profileJson: true, displayName: true },
+    });
+    const current = parseCloudProfileV1(row?.profileJson ?? null);
+    const mediaKey = kind === "avatar" ? "avatarPath" : "wallpaperPath";
+    const merged = mergeCloudProfilePatch(current, {
+      media: { [mediaKey]: mediaPath },
+    });
+
+    const user = await prisma.user.update({
+      where: { id: u.id },
+      data: { profileJson: merged },
+      select: { id: true, email: true, displayName: true, globalRole: true, profileJson: true },
+    });
+
+    return reply.code(201).send({
+      kind,
+      path: mediaPath,
+      profile: parseCloudProfileV1(user.profileJson ?? null),
+      user: toAuthUserDto(user),
+    });
+  });
+
+  app.delete<{ Params: { kind: string } }>("/api/auth/me/profile/media/:kind", async (req, reply) => {
+    const u = await getBearerUser(req);
+    if (!u) return reply.code(401).send({ error: "unauthorized" });
+    const kind = req.params.kind === "avatar" || req.params.kind === "wallpaper" ? req.params.kind : null;
+    if (!kind) return reply.code(400).send({ error: "bad_kind" });
+
+    await deleteProfileMediaFile(u.id, kind);
+    const row = await prisma.user.findUnique({ where: { id: u.id }, select: { profileJson: true } });
+    const current = parseCloudProfileV1(row?.profileJson ?? null);
+    const mediaKey = kind === "avatar" ? "avatarPath" : "wallpaperPath";
+    const merged = mergeCloudProfilePatch(current, { media: { [mediaKey]: null } });
+    await prisma.user.update({ where: { id: u.id }, data: { profileJson: merged } });
+
+    return { ok: true, path: profileMediaApiPath(kind) };
+  });
+
+  app.get<{ Params: { kind: string } }>("/api/auth/me/profile/media/:kind", async (req, reply) => {
+    const u = await getBearerUser(req);
+    if (!u) return reply.code(401).send({ error: "unauthorized" });
+    const kind = req.params.kind === "avatar" || req.params.kind === "wallpaper" ? req.params.kind : null;
+    if (!kind) return reply.code(400).send({ error: "bad_kind" });
+
+    const filePath = await findProfileMediaFile(u.id, kind);
+    if (!filePath) return reply.code(404).send({ error: "not_found" });
+
+    const buf = await fs.readFile(filePath);
+    return reply.type(mimeFromPath(filePath)).header("Cache-Control", "private, max-age=3600").send(buf);
   });
 }

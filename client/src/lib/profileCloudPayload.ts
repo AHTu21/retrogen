@@ -29,13 +29,20 @@ export type CloudProfileV1 = {
     profileAccent: string;
   };
   notifications: UserProfilePrefs["notifications"];
+  media: {
+    avatarPath: string | null;
+    wallpaperPath: string | null;
+  };
 };
+
+const emptyMedia = (): CloudProfileV1["media"] => ({ avatarPath: null, wallpaperPath: null });
 
 export type CloudProfilePatch = {
   identity?: Partial<CloudProfileV1["identity"]>;
   notepad?: string;
   room?: Partial<CloudProfileV1["room"]>;
   notifications?: Partial<CloudProfileV1["notifications"]>;
+  media?: Partial<CloudProfileV1["media"]>;
 };
 
 /** Поля, которые уходят в облако (avatar/wallpaper data URL — только локально). */
@@ -66,6 +73,10 @@ export function extractCloudProfile(prefs: UserProfilePrefs): CloudProfileV1 {
       profileAccent: prefs.profileAccent,
     },
     notifications: { ...prefs.notifications },
+    media: {
+      avatarPath: prefs.avatarMediaPath,
+      wallpaperPath: prefs.wallpaperMediaPath,
+    },
   };
 }
 
@@ -76,6 +87,7 @@ export function cloudProfilePatchFromPrefs(prefs: UserProfilePrefs): CloudProfil
     notepad: c.notepad,
     room: c.room,
     notifications: c.notifications,
+    media: c.media,
   };
 }
 
@@ -85,6 +97,7 @@ export function applyCloudProfileToPrefs(
   authDisplayName?: string,
 ): UserProfilePrefs {
   const id = cloud.identity;
+  const media = cloud.media ?? emptyMedia();
   return {
     ...local,
     displayName: id.displayName || authDisplayName?.trim() || local.displayName,
@@ -111,11 +124,25 @@ export function applyCloudProfileToPrefs(
     wallpaperOpacity: normalizeWallpaperOpacity(cloud.room.wallpaperOpacity),
     profileAccent: cloud.room.profileAccent,
     notifications: normalizeProfileNotifications(cloud.notifications),
+    avatarMediaPath: media.avatarPath,
+    wallpaperMediaPath: media.wallpaperPath,
+    avatarDataUrl: media.avatarPath ? null : local.avatarDataUrl,
+    wallpaperDataUrl: media.wallpaperPath ? null : local.wallpaperDataUrl,
   };
 }
 
 function normalizeCursorStyle(raw: string): UserProfilePrefs["cursorStyle"] {
   return raw === "crosshair" || raw === "pointer" || raw === "grab" ? raw : "default";
+}
+
+function normalizeMediaFromApi(raw: { avatarPath?: string | null; wallpaperPath?: string | null } | undefined) {
+  if (!raw) return emptyMedia();
+  const path = (v: unknown) => {
+    if (typeof v !== "string") return null;
+    const t = v.trim();
+    return t.startsWith("/api/auth/me/profile/media/") ? t : null;
+  };
+  return { avatarPath: path(raw.avatarPath), wallpaperPath: path(raw.wallpaperPath) };
 }
 
 /** Нормализует ответ API в локальный CloudProfileV1. */
@@ -128,6 +155,7 @@ export function normalizeCloudProfileFromApi(
       ...raw.room,
       cursorStyle: normalizeCursorStyle(raw.room.cursorStyle),
     },
+    media: normalizeMediaFromApi(raw.media),
   };
 }
 
@@ -143,6 +171,8 @@ export function cloudProfileHasContent(p: CloudProfileV1): boolean {
     p.notepad.trim() ||
     p.room.boardBackdrop ||
     p.room.headerTint ||
+    p.media.avatarPath ||
+    p.media.wallpaperPath ||
     p.notifications.weeklyDigest ||
     p.notifications.productUpdates
   );

@@ -146,15 +146,15 @@ const SECURITY_FEATURES: SecurityFeature[] = [
   {
     id: "local",
     icon: "💾",
-    title: "Локальный профиль",
-    description: "Аватар, обои доски и история лобби остаются в localStorage этого браузера.",
+    title: "Локальное лобби",
+    description: "История и избранное комнат остаются в localStorage; полный снимок — JSON-бэкап.",
     status: "active",
   },
   {
     id: "cloud",
     icon: "☁",
     title: "Облачный профиль",
-    description: "Имя, блокнот, тема комнаты и уведомления синхронизируются с сервером после входа.",
+    description: "Аватар и обои загружаются на сервер; между устройствами — через API media.",
     status: "active",
   },
   {
@@ -218,7 +218,7 @@ export function SecurityCloudSyncCard({
             </span>
           </div>
           <p className={`mt-1 max-w-md text-[0.8125rem] leading-relaxed ${d.muted}`}>
-            В облаке: имя, контакты, блокнот, тема комнаты, уведомления. Локально: аватар, обои, избранное лобби.
+            В облаке: имя, контакты, блокнот, тема комнаты, уведомления; аватар и обои — через загрузку на сервер. Локально: история лобби в JSON-бэкапе.
             {meta?.serverUpdatedAt ? ` Последнее обновление на сервере: ${formatCloudDate(meta.serverUpdatedAt)}.` : null}
           </p>
         </div>

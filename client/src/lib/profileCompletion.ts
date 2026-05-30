@@ -2,6 +2,7 @@ import type { AuthUserDto } from "../api";
 import type { UserProfilePrefs } from "./profilePrefs";
 import { effectiveBoardWallpaper } from "./profilePrefs";
 import { resolveProfileNotificationEmail } from "./profileNotificationPrefs";
+import { profileHasAvatar } from "./profileMediaCache";
 import type { ProfileSectionId } from "./profileSections";
 
 export type ProfileCompletionTask = {
@@ -26,7 +27,7 @@ export function buildProfileCompletionTasks(
 
   const tasks: ProfileCompletionTask[] = [
     { id: "name", label: "Имя для комнаты", done: hasName, section: "identity" },
-    { id: "avatar", label: "Фото профиля", done: !!prefs.avatarDataUrl, section: "identity" },
+    { id: "avatar", label: "Фото профиля", done: profileHasAvatar(prefs), section: "identity" },
     { id: "bio", label: "Коротко «О себе»", done: !!prefs.signature.trim(), section: "identity" },
     { id: "role", label: "Роль или команда", done: !!(prefs.roleTitle.trim() || prefs.teamName.trim()), section: "identity" },
     { id: "contact", label: "Email или контакт", done: !!shownEmail, section: "identity" },

@@ -13,6 +13,7 @@ type Props = {
   visitedCount: number;
   favoriteCount: number;
   onAvatarFile: (f: File | undefined) => void;
+  avatarSrc?: string | null;
   compact?: boolean;
 };
 
@@ -89,11 +90,13 @@ export function ProfileUserCard({
   visitedCount,
   favoriteCount,
   onAvatarFile,
+  avatarSrc,
   compact = false,
 }: Props) {
   const [zoomOpen, setZoomOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const hasAvatar = !!prefs.avatarDataUrl;
+  const displayAvatar = avatarSrc ?? prefs.avatarDataUrl;
+  const hasAvatar = !!displayAvatar;
   const name = displayNameWithStatus(prefs, authUser);
   const role = authUser?.globalRole === "admin" ? "Администратор" : authUser ? "Участник" : "Гость";
 
@@ -130,7 +133,7 @@ export function ProfileUserCard({
               title={hasAvatar ? "Открыть фото" : undefined}
             >
               {hasAvatar ? (
-                <img src={prefs.avatarDataUrl!} alt="" className="h-full w-full object-cover" />
+                <img src={displayAvatar!} alt="" className="h-full w-full object-cover" />
               ) : (
                 <span
                   className={`flex h-full w-full items-center justify-center bg-[var(--ph-surface-elevated)] font-semibold text-[var(--ph-muted)] ${compact ? "text-sm" : "text-lg"}`}
@@ -192,7 +195,7 @@ export function ProfileUserCard({
       </div>
 
       {hasAvatar ? (
-        <AvatarLightbox d={d} open={zoomOpen} url={prefs.avatarDataUrl!} onClose={() => setZoomOpen(false)} />
+        <AvatarLightbox d={d} open={zoomOpen} url={displayAvatar!} onClose={() => setZoomOpen(false)} />
       ) : null}
     </div>
   );

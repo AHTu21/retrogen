@@ -15,6 +15,7 @@ type Props = {
   favoriteCount: number;
   onGoSection: (id: ProfileSectionId) => void;
   onAvatarFile: (f: File | undefined) => void;
+  avatarSrc?: string | null;
 };
 
 function NavItem({
@@ -131,6 +132,7 @@ export function ProfileSidebar({
   favoriteCount,
   onGoSection,
   onAvatarFile,
+  avatarSrc,
 }: Props) {
   return (
     <aside className={d.sidebar} aria-label="Навигация настроек">
@@ -142,6 +144,7 @@ export function ProfileSidebar({
           visitedCount={visitedCount}
           favoriteCount={favoriteCount}
           onAvatarFile={onAvatarFile}
+          avatarSrc={avatarSrc}
           compact
         />
         <SidebarNav d={d} section={section} navItems={navItems} onGoSection={onGoSection} compact />
@@ -155,6 +158,7 @@ export function ProfileSidebar({
           visitedCount={visitedCount}
           favoriteCount={favoriteCount}
           onAvatarFile={onAvatarFile}
+          avatarSrc={avatarSrc}
         />
         <SidebarNav d={d} section={section} navItems={navItems} onGoSection={onGoSection} />
       </div>

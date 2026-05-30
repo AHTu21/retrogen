@@ -1,7 +1,12 @@
 import type { AuthUserDto } from "../api";
 import { fetchAuthProfile, patchAuthProfile } from "../api";
+import {
+  detectProfileCloudConflict,
+  type ProfileCloudConflict,
+} from "./profileCloudConflict";
 import type { UserProfilePrefs } from "./profilePrefs";
 import { saveProfilePrefs } from "./profilePrefs";
+import { prefetchProfileMedia } from "./profileMediaCache";
 import {
   applyCloudProfileToPrefs,
   cloudProfileHasContent,
@@ -21,15 +26,22 @@ export type CloudSyncState =
   | { kind: "synced"; at: string }
   | { kind: "error"; message: string };
 
+export type PullCloudResult =
+  | { kind: "merged"; prefs: UserProfilePrefs; pulled: boolean }
+  | { kind: "conflict"; conflict: ProfileCloudConflict; prefs: UserProfilePrefs }
+  | { kind: "noop"; prefs: UserProfilePrefs };
+
 export async function pullCloudProfileIntoLocal(
   authUser: AuthUserDto,
   local: UserProfilePrefs,
-): Promise<{ prefs: UserProfilePrefs; pulled: boolean }> {
+  isDirty: boolean,
+): Promise<PullCloudResult> {
   const remote = await fetchAuthProfile();
   const now = new Date().toISOString();
+  const meta = loadCloudMeta();
 
   if (!remote) {
-    return { prefs: local, pulled: false };
+    return { kind: "noop", prefs: local };
   }
 
   if (!remote.profile) {
@@ -37,14 +49,21 @@ export async function pullCloudProfileIntoLocal(
       await pushLocalProfileToCloud(local);
     }
     saveCloudMeta({ lastPulledAt: now, serverUpdatedAt: null });
-    return { prefs: local, pulled: false };
+    return { kind: "noop", prefs: local };
   }
 
-  const merged = applyCloudProfileToPrefs(local, normalizeCloudProfileFromApi(remote.profile), authUser.displayName);
+  const server = normalizeCloudProfileFromApi(remote.profile);
+  const conflict = detectProfileCloudConflict(local, server, meta, isDirty);
+  if (conflict) {
+    return { kind: "conflict", conflict, prefs: local };
+  }
+
+  const merged = applyCloudProfileToPrefs(local, server, authUser.displayName);
   const { prefs: safe } = saveProfilePrefs(merged);
   notifyProfilePrefsChanged();
+  await prefetchProfileMedia(safe);
   saveCloudMeta({ lastPulledAt: now, serverUpdatedAt: remote.profile.updatedAt });
-  return { prefs: safe, pulled: true };
+  return { kind: "merged", prefs: safe, pulled: true };
 }
 
 export async function pushLocalProfileToCloud(

@@ -34,9 +34,9 @@ import { maxLayerZ, minLayerZ } from "../lib/layerZ";
 import {
   cursorCss,
   effectiveBoardBackdrop,
-  effectiveBoardWallpaper,
   wallpaperOpacityFraction,
 } from "../lib/profilePrefs";
+import { resolveProfileWallpaperDisplay } from "../lib/profileMediaCache";
 import { contrastRatio } from "../lib/colorContrast";
 import { STICKER_QUICK_EMOJI } from "../lib/stickerEmojiPresets";
 import {
@@ -4133,11 +4133,11 @@ export function RoomPage() {
         cursor: cursorCss(profilePrefs.cursorStyle),
       }}
     >
-      {effectiveBoardWallpaper(profilePrefs) ? (
+      {resolveProfileWallpaperDisplay(profilePrefs) ? (
         <div
           className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: `url(${effectiveBoardWallpaper(profilePrefs)})`,
+            backgroundImage: `url(${resolveProfileWallpaperDisplay(profilePrefs)})`,
             opacity: wallpaperOpacityFraction(profilePrefs.wallpaperOpacity),
           }}
           aria-hidden

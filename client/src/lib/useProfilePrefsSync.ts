@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { prefetchProfileMedia } from "./profileMediaCache";
 import { loadProfilePrefs, saveProfilePrefs, type UserProfilePrefs } from "./profilePrefs";
 
 export function notifyProfilePrefsChanged() {
@@ -9,8 +10,14 @@ export function useProfilePrefsSync() {
   const [prefs, setPrefs] = useState<UserProfilePrefs>(() => loadProfilePrefs());
 
   const refresh = useCallback(() => {
-    setPrefs(loadProfilePrefs());
+    const loaded = loadProfilePrefs();
+    setPrefs(loaded);
+    void prefetchProfileMedia(loaded);
   }, []);
+
+  useEffect(() => {
+    void prefetchProfileMedia(prefs);
+  }, [prefs.avatarMediaPath, prefs.wallpaperMediaPath]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {

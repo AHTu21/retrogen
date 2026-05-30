@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AuthUserDto } from "../api";
+import {
+  resolveProfileCloudConflict,
+  type ConflictResolution,
+  type ProfileCloudConflict,
+} from "./profileCloudConflict";
+import { prefetchProfileMedia } from "./profileMediaCache";
 import type { UserProfilePrefs } from "./profilePrefs";
+import { saveProfilePrefs } from "./profilePrefs";
 import { loadCloudMeta, extractCloudProfile, type CloudProfileMeta } from "./profileCloudPayload";
 import {
   formatCloudSyncLabel,
@@ -8,6 +15,7 @@ import {
   pushLocalProfileToCloud,
   type CloudSyncState,
 } from "./profileCloudSync";
+import { notifyProfilePrefsChanged } from "./useProfilePrefsSync";
 
 const PUSH_DEBOUNCE_MS = 900;
 
@@ -30,6 +38,7 @@ export function useProfileCloudSync({
 }: UseProfileCloudSyncOptions) {
   const [state, setState] = useState<CloudSyncState>({ kind: "idle" });
   const [meta, setMeta] = useState<CloudProfileMeta>(() => loadCloudMeta());
+  const [conflict, setConflict] = useState<ProfileCloudConflict | null>(null);
   const pulledForUser = useRef<string | null>(null);
   const pushTimer = useRef<number | null>(null);
   const lastPushedJson = useRef<string | null>(null);
@@ -40,28 +49,39 @@ export function useProfileCloudSync({
     if (!authUser) return;
     setState({ kind: "pulling" });
     try {
-      const { prefs: merged, pulled } = await pullCloudProfileIntoLocal(authUser, prefs);
+      const result = await pullCloudProfileIntoLocal(authUser, prefs, isDirty);
       refreshMeta();
-      if (pulled) {
-        onMergedFromCloud(merged, "Подтянуто из облака");
+      if (result.kind === "conflict") {
+        setConflict(result.conflict);
+        setState({ kind: "idle" });
+        return;
       }
+      if (result.kind === "merged" && result.pulled) {
+        onMergedFromCloud(result.prefs, "Подтянуто из облака");
+      }
+      setConflict(null);
       setState({ kind: "synced", at: new Date().toISOString() });
     } catch {
       setState({ kind: "error", message: "Не удалось загрузить профиль" });
     }
-  }, [authUser, prefs, onMergedFromCloud, refreshMeta]);
+  }, [authUser, prefs, isDirty, onMergedFromCloud, refreshMeta]);
 
   useEffect(() => {
     if (!authUser) {
       pulledForUser.current = null;
+      setConflict(null);
       setState({ kind: "idle" });
       return;
     }
     if (pulledForUser.current === authUser.id) return;
-    if (isDirty) return;
     pulledForUser.current = authUser.id;
     void pullOnce();
-  }, [authUser, isDirty, pullOnce]);
+  }, [authUser, pullOnce]);
+
+  useEffect(() => {
+    if (!authUser) return;
+    void prefetchProfileMedia(prefs);
+  }, [authUser, prefs.avatarMediaPath, prefs.wallpaperMediaPath]);
 
   const schedulePush = useCallback(
     (safe: UserProfilePrefs) => {
@@ -89,6 +109,30 @@ export function useProfileCloudSync({
     [authUser, validationBlocked, onAuthUserUpdated, refreshMeta],
   );
 
+  const resolveConflict = useCallback(
+    (choice: ConflictResolution) => {
+      if (!authUser || !conflict) return;
+      const resolved = resolveProfileCloudConflict(prefs, conflict, choice, authUser.displayName);
+      const { prefs: safe } = saveProfilePrefs(resolved);
+      notifyProfilePrefsChanged();
+      void prefetchProfileMedia(safe).then(() => {
+        onMergedFromCloud(
+          safe,
+          choice === "server" ? "Версия с сервера" : choice === "merge" ? "Объединено" : "Ваши изменения",
+        );
+        setConflict(null);
+        if (choice === "local" || choice === "merge") {
+          schedulePush(safe);
+        } else {
+          lastPushedJson.current = JSON.stringify(extractCloudProfile(safe));
+          refreshMeta();
+        }
+        setState({ kind: "synced", at: new Date().toISOString() });
+      });
+    },
+    [authUser, conflict, prefs, onMergedFromCloud, schedulePush, refreshMeta],
+  );
+
   useEffect(() => {
     return () => {
       if (pushTimer.current) window.clearTimeout(pushTimer.current);
@@ -101,7 +145,9 @@ export function useProfileCloudSync({
     cloudSyncState: state,
     cloudSyncMeta: meta,
     cloudSyncLabel: label,
+    cloudConflict: conflict,
     scheduleCloudPush: schedulePush,
     retryCloudSync: pullOnce,
+    resolveCloudConflict: resolveConflict,
   };
 }
