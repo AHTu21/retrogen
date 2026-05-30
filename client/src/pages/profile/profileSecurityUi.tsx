@@ -191,7 +191,7 @@ export function SecurityCloudSyncCard({
   if (!authUser) return null;
 
   const synced = state?.kind === "synced" || meta?.lastPushedAt || meta?.serverUpdatedAt;
-  const errored = state?.kind === "error";
+  const offline = state?.kind === "offline";
 
   return (
     <section className="space-y-2">
@@ -203,26 +203,26 @@ export function SecurityCloudSyncCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-[0.9375rem] font-semibold text-[var(--ph-text)]">
-              {label ?? (synced ? "Синхронизировано" : "Ожидание")}
+              {label ?? (synced ? "Синхронизировано" : offline ? "Локально" : "Ожидание")}
             </p>
             <span
               className={`px-2 py-0.5 text-[0.625rem] font-semibold uppercase ${d.rFull} ${
-                errored
-                  ? "bg-red-500/12 text-red-700 dark:text-red-300"
-                  : synced
-                    ? d.badgeLive
-                    : d.badgePreview
+                offline ? d.badgeDone : synced ? d.badgeLive : d.badgePreview
               }`}
             >
-              {errored ? "Ошибка" : synced ? "Активно" : "Синхронизация"}
+              {offline ? "Локально" : synced ? "Активно" : "Синхронизация"}
             </span>
           </div>
           <p className={`mt-1 max-w-md text-[0.8125rem] leading-relaxed ${d.muted}`}>
-            В облаке: имя, контакты, блокнот, тема комнаты, уведомления; аватар и обои — через загрузку на сервер. Локально: история лобби в JSON-бэкапе.
-            {meta?.serverUpdatedAt ? ` Последнее обновление на сервере: ${formatCloudDate(meta.serverUpdatedAt)}.` : null}
+            {offline
+              ? "Сервер профиля временно недоступен — настройки работают локально. Нажмите «Повторить», когда связь восстановится."
+              : "В облаке: имя, контакты, блокнот, тема комнаты, уведомления; аватар и обои — через загрузку на сервер. Локально: история лобби в JSON-бэкапе."}
+            {!offline && meta?.serverUpdatedAt
+              ? ` Последнее обновление на сервере: ${formatCloudDate(meta.serverUpdatedAt)}.`
+              : null}
           </p>
         </div>
-        {errored && onRetry ? (
+        {offline && onRetry ? (
           <button type="button" className={`${d.btnSecondary} shrink-0`} onClick={onRetry}>
             Повторить
           </button>

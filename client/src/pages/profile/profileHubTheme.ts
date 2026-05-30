@@ -23,7 +23,7 @@ export const PROFILE_NAV: ProfileNavItem[] = [
   {
     id: "notifications",
     label: "Уведомления",
-    hint: "Email о завершении ретро, дайджест и новости — настройки сохраняются в профиле",
+    hint: "Email о завершении ретро, дайджест и новости — локально и в облаке после входа",
   },
   {
     id: "organization",

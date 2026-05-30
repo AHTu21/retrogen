@@ -493,11 +493,21 @@ export type CloudProfilePatchDto = {
   media?: Partial<NonNullable<CloudProfileV1Dto["media"]>>;
 };
 
-export async function fetchAuthProfile(): Promise<{ profile: CloudProfileV1Dto | null } | null> {
-  const res = await apiFetch("/api/auth/me/profile");
-  if (res.status === 401) return null;
-  if (!res.ok) throw new Error("profile_fetch_failed");
-  return res.json() as Promise<{ profile: CloudProfileV1Dto | null }>;
+export type AuthProfileFetchResult =
+  | { status: "ok"; profile: CloudProfileV1Dto | null }
+  | { status: "unauthorized" }
+  | { status: "unavailable" };
+
+export async function fetchAuthProfile(): Promise<AuthProfileFetchResult> {
+  try {
+    const res = await apiFetch("/api/auth/me/profile");
+    if (res.status === 401) return { status: "unauthorized" };
+    if (!res.ok) return { status: "unavailable" };
+    const data = (await res.json()) as { profile: CloudProfileV1Dto | null };
+    return { status: "ok", profile: data.profile ?? null };
+  } catch {
+    return { status: "unavailable" };
+  }
 }
 
 export async function patchAuthProfile(

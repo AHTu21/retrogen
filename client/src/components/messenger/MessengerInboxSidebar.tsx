@@ -9,8 +9,10 @@ import {
   searchMessengerUsers,
   updateAuthDisplayName,
 } from "../../api";
-import { readImageDataUrlFromFile } from "../../lib/messengerAvatar";
 import { getMessengerModalPortalRoot } from "../../lib/messengerModalPortal";
+import { applyProfileAvatarFile, profileAvatarErrorMessage } from "../../lib/profileAvatarUpload";
+import { profileHasAvatar } from "../../lib/profileMediaCache";
+import { pushLocalProfileToCloud } from "../../lib/profileCloudSync";
 import { MessengerModalBackdrop } from "./MessengerModalBackdrop";
 import {
   avatarShapeClass,
@@ -26,6 +28,7 @@ import {
   type MessengerSettingsButtonId,
 } from "../../lib/messengerProfileAppearance";
 import type { UserProfilePrefs } from "../../lib/profilePrefs";
+import { useProfileMediaDisplay } from "../../lib/useProfileMediaDisplay";
 import { useProfilePrefsDraft } from "../../lib/useProfilePrefsDraft";
 import { MessengerProfileAppearanceModal } from "./MessengerProfileAppearanceModal";
 import { MessengerProfileSettingsModal } from "./MessengerProfileSettingsModal";
@@ -84,16 +87,22 @@ export function MessengerInboxSidebar({
     autosaveMs: 0,
     onAfterCommit: (safe) => {
       const name = safe.displayName.trim().slice(0, 120);
-      if (!name) return;
-      void updateAuthDisplayName(name)
-        .then(onMeUpdated)
-        .catch(() => {
-          /* local only */
-        });
+      if (name) {
+        void updateAuthDisplayName(name)
+          .then(onMeUpdated)
+          .catch(() => {
+            /* local only */
+          });
+      }
+      void pushLocalProfileToCloud(safe).then((res) => {
+        if (res) onMeUpdated(res.user);
+      });
     },
   });
+  const { avatarSrc } = useProfileMediaDisplay(profile.prefs);
   const [railPanel, setRailPanel] = useState<RailPanel | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [groupTitle, setGroupTitle] = useState("");
   const [channelTitle, setChannelTitle] = useState("");
   const [channelDescription, setChannelDescription] = useState("");
@@ -110,7 +119,7 @@ export function MessengerInboxSidebar({
 
   const displayName =
     profile.prefs.displayName.trim() || me.displayName.trim() || me.email;
-  const hasAvatar = !!profile.prefs.avatarDataUrl;
+  const hasAvatar = profileHasAvatar(profile.prefs);
   const savedChat = chats.find((c) => c.isSaved === true);
   const directChats = chats.filter((c) => c.kind === "direct" && !c.isSaved);
   const visibleChats = chats.filter((c) => !c.isSaved);
@@ -140,13 +149,17 @@ export function MessengerInboxSidebar({
   }
 
   function onAvatarPick(file: File | undefined) {
-    readImageDataUrlFromFile(
-      file,
-      (url) => {
-        profile.commit({ ...profile.prefs, avatarDataUrl: url });
-      },
-      (msg) => window.alert(msg),
-    );
+    setAvatarUploading(true);
+    void applyProfileAvatarFile(file, profile.prefs, me)
+      .then((result) => {
+        if (!result.ok) {
+          if (result.reason !== "no_file") window.alert(profileAvatarErrorMessage(result.reason));
+          return;
+        }
+        profile.commit(result.prefs);
+        if (result.user) onMeUpdated(result.user);
+      })
+      .finally(() => setAvatarUploading(false));
   }
 
   async function saveProfileFromMessenger(draftOverride?: UserProfilePrefs) {
@@ -207,9 +220,9 @@ export function MessengerInboxSidebar({
           activeClass={railBtnActive}
           onClick={() => togglePanel("profile")}
         >
-          {hasAvatar ? (
+          {hasAvatar && avatarSrc ? (
             <img
-              src={profile.prefs.avatarDataUrl!}
+              src={avatarSrc}
               alt=""
               className="size-8 rounded-full object-cover"
             />
@@ -332,6 +345,8 @@ export function MessengerInboxSidebar({
                       draft={profile.prefs}
                       setDraft={profile.setPrefs}
                       hasAvatar={hasAvatar}
+                      avatarSrc={avatarSrc}
+                      avatarUploading={avatarUploading}
                       avatarZoomOpen={avatarZoomOpen}
                       onToggleZoom={() => hasAvatar && setAvatarZoomOpen((o) => !o)}
                       onPickAvatar={() => avatarInputRef.current?.click()}
@@ -535,7 +550,7 @@ export function MessengerInboxSidebar({
         </div>
       </div>
 
-      {avatarZoomOpen && hasAvatar
+      {avatarZoomOpen && hasAvatar && avatarSrc
         ? createPortal(
             <MessengerModalBackdrop
               zIndexClass="z-[400]"
@@ -543,7 +558,7 @@ export function MessengerInboxSidebar({
               onBackdropClick={() => setAvatarZoomOpen(false)}
             >
               <img
-                src={profile.prefs.avatarDataUrl!}
+                src={avatarSrc}
                 alt=""
                 role="dialog"
                 aria-modal="true"
@@ -671,6 +686,8 @@ function ProfilePanel({
   me,
   displayName,
   hasAvatar,
+  avatarSrc,
+  avatarUploading,
   avatarZoomOpen,
   onToggleZoom,
   onPickAvatar,
@@ -689,6 +706,8 @@ function ProfilePanel({
   draft: UserProfilePrefs;
   setDraft: React.Dispatch<React.SetStateAction<UserProfilePrefs>>;
   hasAvatar: boolean;
+  avatarSrc: string | null;
+  avatarUploading: boolean;
   avatarZoomOpen: boolean;
   onToggleZoom: () => void;
   onPickAvatar: () => void;
@@ -784,9 +803,9 @@ function ProfilePanel({
               onClick={onToggleZoom}
               disabled={!hasAvatar}
             >
-              {hasAvatar && draft.avatarDataUrl ? (
+              {hasAvatar && avatarSrc ? (
                 <img
-                  src={draft.avatarDataUrl}
+                  src={avatarSrc}
                   alt=""
                   className={`size-20 object-cover ${avatarRound}`}
                   style={avatarRadius}
@@ -804,9 +823,10 @@ function ProfilePanel({
             </button>
             <button
               type="button"
-              className="absolute bottom-0 left-0 z-20 flex size-7 -translate-x-1 translate-y-2.5 items-center justify-center rounded-full bg-zinc-950/90 text-white opacity-0 shadow ring-2 ring-white/30 transition-[opacity,background-color] hover:bg-zinc-800 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
-              title="Изменить фото"
-              aria-label="Изменить фото"
+              disabled={avatarUploading}
+              className="absolute bottom-0 left-0 z-20 flex size-7 -translate-x-1 translate-y-2.5 items-center justify-center rounded-full bg-zinc-950/90 text-white opacity-0 shadow ring-2 ring-white/30 transition-[opacity,background-color] hover:bg-zinc-800 focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-50 [@media(hover:none)]:opacity-100"
+              title={avatarUploading ? "Загрузка…" : "Изменить фото"}
+              aria-label={avatarUploading ? "Загрузка фото" : "Изменить фото"}
               onClick={(e) => {
                 e.stopPropagation();
                 onPickAvatar();

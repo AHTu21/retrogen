@@ -88,6 +88,21 @@ components/room/           — UI комнаты, связанный с проф
 - **`POST/GET/DELETE /api/auth/me/profile/media/{avatar|wallpaper}`** — файлы на сервере (`data/profile-media/`)
 - Клиент: pull/push, **conflict banner** (мои / сервер / объединить), `useProfileMediaDisplay`
 - Merge: при dirty + server newer → UI; smart merge по `updatedAt` + media paths
+- **Offline:** недоступный API → pill «Локально» + повторить, без alarmist error
+
+### Фаза F — Messenger cloud bridge ✅
+
+- `lib/profileAvatarUpload.ts` — общая загрузка аватара (облако + fallback data URL)
+- Мессенджер: `useProfileMediaDisplay`, upload через `/api/auth/me/profile/media`, `pushLocalProfileToCloud` после commit
+- `/profile` и мессенджер используют один путь для аватара
+
+### Дальше
+
+| Задача | Приоритет |
+|--------|-----------|
+| Серверная email-рассылка по `prefs.notifications` | высокий |
+| S3/CDN вместо `data/profile-media/` | средний |
+| Pull cloud при открытии панели мессенджера (без затирания черновика) | низкий |
 
 ---
 

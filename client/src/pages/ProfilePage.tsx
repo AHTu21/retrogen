@@ -6,6 +6,7 @@ import { RetrogenOverflowMenu } from "../components/RetrogenOverflowMenu";
 import { MessengerNavIconButton } from "../components/MessengerNavIconButton";
 import { ThemeCornersIconButtons } from "../components/ThemeCornersIconButtons";
 import { fetchAuthMe, logoutAccount, uploadProfileMedia, type AuthUserDto } from "../api";
+import { applyProfileAvatarFile, profileAvatarErrorMessage } from "../lib/profileAvatarUpload";
 import { seedProfileMediaCache } from "../lib/profileMediaCache";
 import { useProfileMediaDisplay } from "../lib/useProfileMediaDisplay";
 import { ProfileCloudConflictBanner } from "./profile/ProfileCloudConflictBanner";
@@ -214,39 +215,14 @@ export function ProfilePage() {
   }
 
   function onAvatarFile(f: File | undefined) {
-    if (!f) return;
-    if (!f.type.startsWith("image/")) {
-      window.alert("Выберите файл изображения.");
-      return;
-    }
-    if (authUser) {
-      void uploadProfileMedia("avatar", f)
-        .then((res) => {
-          readImageFile(f, (url) => {
-            if (url) seedProfileMediaCache(res.path, url);
-          });
-          const next = {
-            ...prefs,
-            avatarDataUrl: null,
-            avatarMediaPath: res.path,
-          };
-          setPrefs(next);
-          commit(next);
-          setAuthUser(res.user);
-        })
-        .catch(() => {
-          readImageFile(f, (url) => {
-            const next = { ...prefs, avatarDataUrl: url, avatarMediaPath: null };
-            setPrefs(next);
-            commit(next);
-          });
-        });
-      return;
-    }
-    readImageFile(f, (url) => {
-      const next = { ...prefs, avatarDataUrl: url };
-      setPrefs(next);
-      commit(next);
+    void applyProfileAvatarFile(f, prefs, authUser).then((result) => {
+      if (!result.ok) {
+        if (result.reason !== "no_file") window.alert(profileAvatarErrorMessage(result.reason));
+        return;
+      }
+      setPrefs(result.prefs);
+      commit(result.prefs);
+      if (result.user) setAuthUser(result.user);
     });
   }
 
@@ -320,10 +296,10 @@ export function ProfilePage() {
               {cloudSyncLabel ? (
                 <span
                   className={
-                    cloudSyncState.kind === "error"
-                      ? d.savePillWarn
-                      : cloudSyncState.kind === "synced"
-                        ? d.savePillActive
+                    cloudSyncState.kind === "synced"
+                      ? d.savePillActive
+                      : cloudSyncState.kind === "offline"
+                        ? d.savePill
                         : d.savePill
                   }
                   role="status"
@@ -331,6 +307,11 @@ export function ProfilePage() {
                 >
                   {cloudSyncLabel}
                 </span>
+              ) : null}
+              {authUser && cloudSyncState.kind === "offline" ? (
+                <button type="button" className={d.btnGhost} onClick={() => void retryCloudSync()}>
+                  Повторить синх.
+                </button>
               ) : null}
               {saveStatus ? (
                 <span

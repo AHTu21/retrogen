@@ -24,12 +24,12 @@ export type CloudSyncState =
   | { kind: "pulling" }
   | { kind: "pushing" }
   | { kind: "synced"; at: string }
-  | { kind: "error"; message: string };
+  | { kind: "offline" };
 
 export type PullCloudResult =
   | { kind: "merged"; prefs: UserProfilePrefs; pulled: boolean }
   | { kind: "conflict"; conflict: ProfileCloudConflict; prefs: UserProfilePrefs }
-  | { kind: "noop"; prefs: UserProfilePrefs };
+  | { kind: "noop"; prefs: UserProfilePrefs; offline?: boolean };
 
 export async function pullCloudProfileIntoLocal(
   authUser: AuthUserDto,
@@ -40,13 +40,20 @@ export async function pullCloudProfileIntoLocal(
   const now = new Date().toISOString();
   const meta = loadCloudMeta();
 
-  if (!remote) {
+  if (remote.status === "unauthorized") {
     return { kind: "noop", prefs: local };
+  }
+
+  if (remote.status === "unavailable") {
+    return { kind: "noop", prefs: local, offline: true };
   }
 
   if (!remote.profile) {
     if (cloudProfileHasContent(extractCloudProfile(local))) {
-      await pushLocalProfileToCloud(local);
+      const pushed = await pushLocalProfileToCloud(local);
+      if (!pushed) {
+        return { kind: "noop", prefs: local, offline: true };
+      }
     }
     saveCloudMeta({ lastPulledAt: now, serverUpdatedAt: null });
     return { kind: "noop", prefs: local };
@@ -69,23 +76,27 @@ export async function pullCloudProfileIntoLocal(
 export async function pushLocalProfileToCloud(
   prefs: UserProfilePrefs,
 ): Promise<{ profile: CloudProfileV1 | null; user: AuthUserDto } | null> {
-  const patch = cloudProfilePatchFromPrefs(prefs);
-  const res = await patchAuthProfile(patch);
-  const now = new Date().toISOString();
-  saveCloudMeta({
-    lastPushedAt: now,
-    serverUpdatedAt: res.profile?.updatedAt ?? now,
-  });
-  return {
-    profile: res.profile ? normalizeCloudProfileFromApi(res.profile) : null,
-    user: res.user,
-  };
+  try {
+    const patch = cloudProfilePatchFromPrefs(prefs);
+    const res = await patchAuthProfile(patch);
+    const now = new Date().toISOString();
+    saveCloudMeta({
+      lastPushedAt: now,
+      serverUpdatedAt: res.profile?.updatedAt ?? now,
+    });
+    return {
+      profile: res.profile ? normalizeCloudProfileFromApi(res.profile) : null,
+      user: res.user,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function formatCloudSyncLabel(state: CloudSyncState, meta = loadCloudMeta()): string | null {
   if (state.kind === "pulling") return "Загрузка из облака…";
   if (state.kind === "pushing") return "Синхронизация…";
-  if (state.kind === "error") return state.message;
+  if (state.kind === "offline") return "Локально";
   if (state.kind === "synced") return "Синхронизировано";
   if (meta.lastPushedAt || meta.serverUpdatedAt) return "В облаке";
   return null;

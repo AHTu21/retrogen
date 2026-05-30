@@ -56,13 +56,17 @@ export function useProfileCloudSync({
         setState({ kind: "idle" });
         return;
       }
+      if (result.kind === "noop" && result.offline) {
+        setState({ kind: "offline" });
+        return;
+      }
       if (result.kind === "merged" && result.pulled) {
         onMergedFromCloud(result.prefs, "Подтянуто из облака");
       }
       setConflict(null);
       setState({ kind: "synced", at: new Date().toISOString() });
     } catch {
-      setState({ kind: "error", message: "Не удалось загрузить профиль" });
+      setState({ kind: "offline" });
     }
   }, [authUser, prefs, isDirty, onMergedFromCloud, refreshMeta]);
 
@@ -93,17 +97,16 @@ export function useProfileCloudSync({
       pushTimer.current = window.setTimeout(() => {
         pushTimer.current = null;
         setState({ kind: "pushing" });
-        void pushLocalProfileToCloud(safe)
-          .then((res) => {
-            if (!res) return;
-            lastPushedJson.current = cloudJson;
-            onAuthUserUpdated(res.user);
-            refreshMeta();
-            setState({ kind: "synced", at: new Date().toISOString() });
-          })
-          .catch(() => {
-            setState({ kind: "error", message: "Не удалось синхронизировать" });
-          });
+        void pushLocalProfileToCloud(safe).then((res) => {
+          if (!res) {
+            setState({ kind: "offline" });
+            return;
+          }
+          lastPushedJson.current = cloudJson;
+          onAuthUserUpdated(res.user);
+          refreshMeta();
+          setState({ kind: "synced", at: new Date().toISOString() });
+        });
       }, PUSH_DEBOUNCE_MS);
     },
     [authUser, validationBlocked, onAuthUserUpdated, refreshMeta],
