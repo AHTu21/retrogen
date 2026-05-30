@@ -3,21 +3,25 @@ import { identityHasBlockingErrors } from "./profileIdentityValidation";
 import { loadProfilePrefs, saveProfilePrefs, type UserProfilePrefs } from "./profilePrefs";
 import { notifyProfilePrefsChanged } from "./useProfilePrefsSync";
 
-const VALIDATION_SAVE_MSG = "Исправьте Telegram или сайт перед сохранением.";
+export const VALIDATION_SAVE_MSG = "Исправьте Telegram или сайт перед сохранением.";
 
 export type ProfilePrefsDraftOptions = {
   /** Debounce autosave, ms. 0 — только ручной commit. */
   autosaveMs?: number;
   /** Блокировать autosave при невалидных identity-полях. */
   blockOnIdentityErrors?: boolean;
+  /** После успешного save (autosave или commit). */
+  onAfterCommit?: (safe: UserProfilePrefs) => void;
 };
 
 /**
- * Единый паттерн: load → edit draft → autosave → event bus.
- * Используется ProfilePage; мессенджер — позже (Фаза B).
+ * Единый паттерн: load → edit draft → autosave/commit → event bus.
+ * ProfilePage — autosave; мессенджер — manual commit при «Сохранить».
  */
 export function useProfilePrefsDraft(options: ProfilePrefsDraftOptions = {}) {
-  const { autosaveMs = 0, blockOnIdentityErrors = false } = options;
+  const { autosaveMs = 0, blockOnIdentityErrors = false, onAfterCommit } = options;
+  const onAfterCommitRef = useRef(onAfterCommit);
+  onAfterCommitRef.current = onAfterCommit;
 
   const [prefs, setPrefs] = useState<UserProfilePrefs>(() => loadProfilePrefs());
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(loadProfilePrefs()));
@@ -28,39 +32,62 @@ export function useProfilePrefsDraft(options: ProfilePrefsDraftOptions = {}) {
   const isDirty = JSON.stringify(prefs) !== savedSnapshot;
   const validationBlocked = blockOnIdentityErrors && identityHasBlockingErrors(prefs);
 
-  useEffect(() => {
-    const refresh = () => {
-      if (isDirty) return;
-      const loaded = loadProfilePrefs();
-      setPrefs(loaded);
-      setSavedSnapshot(JSON.stringify(loaded));
-    };
-    window.addEventListener("retrogen-profile", refresh);
-    return () => window.removeEventListener("retrogen-profile", refresh);
-  }, [isDirty]);
-
-  const commit = useCallback((next?: UserProfilePrefs) => {
-    const payload = next ?? prefs;
-    const { prefs: safe, error } = saveProfilePrefs(payload);
-    setPrefs(safe);
-    setSavedSnapshot(JSON.stringify(safe));
-    notifyProfilePrefsChanged();
-    if (error === "quota") {
-      setSaveError("Недостаточно места в браузере — уменьшите обои или аватар.");
-      setSavedHint(null);
-      return safe;
-    }
-    setSaveError(null);
-    setSavedHint("Сохранено");
-    window.setTimeout(() => setSavedHint(null), 2000);
-    return safe;
-  }, [prefs]);
-
-  const discard = useCallback(() => {
+  const reload = useCallback(() => {
     const loaded = loadProfilePrefs();
     setPrefs(loaded);
     setSavedSnapshot(JSON.stringify(loaded));
     setSaveError(null);
+    return loaded;
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (isDirty) return;
+      reload();
+    };
+    window.addEventListener("retrogen-profile", refresh);
+    return () => window.removeEventListener("retrogen-profile", refresh);
+  }, [isDirty, reload]);
+
+  const commit = useCallback(
+    (next?: UserProfilePrefs) => {
+      const payload = next ?? prefs;
+      const { prefs: safe, error } = saveProfilePrefs(payload);
+      setPrefs(safe);
+      setSavedSnapshot(JSON.stringify(safe));
+      notifyProfilePrefsChanged();
+      if (error === "quota") {
+        setSaveError("Недостаточно места в браузере — уменьшите обои или аватар.");
+        setSavedHint(null);
+        return safe;
+      }
+      setSaveError(null);
+      setSavedHint("Сохранено");
+      window.setTimeout(() => setSavedHint(null), 2000);
+      onAfterCommitRef.current?.(safe);
+      return safe;
+    },
+    [prefs],
+  );
+
+  const discard = useCallback(() => {
+    reload();
+  }, [reload]);
+
+  /** UI state после внешнего save (import backup и т.п.) — без повторной записи. */
+  const replacePrefs = useCallback((next: UserProfilePrefs, hint?: string) => {
+    setPrefs(next);
+    setSavedSnapshot(JSON.stringify(next));
+    setSaveError(null);
+    if (hint) {
+      setSavedHint(hint);
+      window.setTimeout(() => setSavedHint(null), 2000);
+    }
+  }, []);
+
+  const flashHint = useCallback((text: string) => {
+    setSavedHint(text);
+    window.setTimeout(() => setSavedHint(null), 2000);
   }, []);
 
   useEffect(() => {
@@ -98,7 +125,8 @@ export function useProfilePrefsDraft(options: ProfilePrefsDraftOptions = {}) {
     saveStatus,
     commit,
     discard,
+    reload,
+    replacePrefs,
+    flashHint,
   };
 }
-
-export { VALIDATION_SAVE_MSG };

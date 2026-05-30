@@ -8,6 +8,10 @@
 
 ## [Unreleased]
 
+### Профиль (`/profile`) + мессенджер
+
+- **`useProfilePrefsDraft`:** ProfilePage и мессенджер на едином hook (autosave / manual commit, `onAfterCommit` для sync имени с API).
+
 ### Комната + профиль
 
 - **Identity bridge:** имя, emoji и аватар из `/profile` используются в комнате (стикеры, chip в шапке); `useProfilePrefsSync` вместо дублирования listeners.

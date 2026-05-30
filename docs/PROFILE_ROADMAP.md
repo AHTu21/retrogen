@@ -12,8 +12,8 @@ lib/
   profileUser.ts           — displayHandle, displayNameWithStatus, initials
   roomActorProfile.ts      — identity участника в комнате (из prefs + auth)
   profileCompletion.ts     — задачи заполнения (%)
-  useProfilePrefsSync.ts   — read + commit + event bus
-  useLobbyPrefsSync.ts     — visited/favorites revision
+  useProfilePrefsDraft.ts  — draft + autosave/commit (ProfilePage, messenger)
+  useProfilePrefsSync.ts   — read-only sync (RoomPage)
   profileBackup.ts         — JSON export/import v1
 
 pages/profile/
@@ -32,7 +32,7 @@ components/room/           — UI комнаты, связанный с проф
 
 ## Фазы
 
-### Фаза A — Room identity bridge ✅ (в работе)
+### Фаза A — Room identity bridge ✅
 
 **Цель:** то, что пользователь настраивает в «Личные данные», видно в комнате (имя на стикерах, chip в шапке).
 
@@ -49,20 +49,16 @@ components/room/           — UI комнаты, связанный с проф
 
 ---
 
-### Фаза B — Unified draft hook
+### Фаза B — Unified draft hook ✅
 
-**Цель:** один паттерн load → edit → autosave для ProfilePage и мессенджера.
+**Цель:** один паттерн load → edit → autosave/commit для ProfilePage и мессенджера.
 
-```
-useProfilePrefsDraft()
-  prefs, setPrefs, isDirty, commit, discard
-  + refresh on retrogen-profile только если !isDirty
-```
+**API:** `reload`, `discard`, `replacePrefs`, `flashHint`, `onAfterCommit`, `saveStatus`.
 
-| Заменить | Файл |
-|----------|------|
-| ~80 строк manual state | `ProfilePage.tsx` |
-| profileDraft + hook | `MessengerInboxSidebar.tsx` |
+| Режим | autosaveMs | Где |
+|-------|------------|-----|
+| Autosave | 450 | ProfilePage |
+| Manual | 0 | MessengerInboxSidebar |
 
 ---
 
@@ -117,4 +113,4 @@ useProfilePrefsDraft()
 |--------|------------|
 | 0.15.0 | Foundation: completion, emoji, lobby events, roadmap |
 | 0.16.0 | Room identity bridge (Фаза A) |
-| 0.17.0 | useProfilePrefsDraft (Фаза B) |
+| 0.17.0 | useProfilePrefsDraft в ProfilePage + messenger (Фаза B) |
