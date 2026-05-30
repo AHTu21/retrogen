@@ -8,6 +8,12 @@
 
 ## [Unreleased]
 
+### Комната + профиль
+
+- **Identity bridge:** имя, emoji и аватар из `/profile` используются в комнате (стикеры, chip в шапке); `useProfilePrefsSync` вместо дублирования listeners.
+- **`lib/roomActorProfile.ts`** — единый resolver identity участника.
+- **`useProfilePrefsDraft`** — заготовка unified draft hook (Фаза B).
+
 _Черновик до следующего релиза; в окне «О программе» не показывается._
 
 <!-- changelog:user -->

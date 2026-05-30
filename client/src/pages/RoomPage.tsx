@@ -36,8 +36,6 @@ import {
   effectiveBoardBackdrop,
   effectiveBoardWallpaper,
   wallpaperOpacityFraction,
-  loadProfilePrefs,
-  type UserProfilePrefs,
 } from "../lib/profilePrefs";
 import { contrastRatio } from "../lib/colorContrast";
 import { STICKER_QUICK_EMOJI } from "../lib/stickerEmojiPresets";
@@ -65,7 +63,6 @@ import { stickerCardEditorContent } from "../lib/stickerTextDoc";
 import {
   buildMentionCandidatesFromRoom,
   cardHtmlMentionsMe,
-  currentActorDisplayName,
   currentActorMentionIds,
   filterMentionCandidates,
   getMentionAutocompleteAtCaret,
@@ -93,10 +90,12 @@ import { useAppCorners, useAppTheme } from "../theme";
 import { RoomPasswordGate } from "../components/RoomPasswordGate";
 import { RetrogenDockableAbout } from "../components/RetrogenDockableAbout";
 import { RetrogenOverflowMenu } from "../components/RetrogenOverflowMenu";
+import { RoomActorIdentityChip } from "../components/room/RoomActorIdentityChip";
+import { buildRoomActorProfile } from "../lib/roomActorProfile";
+import { useProfilePrefsSync } from "../lib/useProfilePrefsSync";
 import { MessengerNavIconButton } from "../components/MessengerNavIconButton";
 import { ThemeCornersIconButtons } from "../components/ThemeCornersIconButtons";
 
-const GUEST_NAME_KEY = "retrogen_guest_name";
 const PARTICIPANT_KEY = "retrogen_participant_key";
 const MEMES_KEY_PREFIX = "retrogen_memes";
 const BOARD_LAYOUT_KEY_PREFIX = "retrogen_board_layout_v2";
@@ -426,16 +425,6 @@ function htmlToMarkdownLite(html: string): string {
     .trim();
 }
 
-function getGuestName(): string {
-  try {
-    const v = localStorage.getItem(GUEST_NAME_KEY);
-    if (v && v.trim()) return v.trim();
-  } catch {
-    /* ignore */
-  }
-  return "";
-}
-
 function getOrCreateParticipantKey(): string {
   try {
     const existing = localStorage.getItem(PARTICIPANT_KEY);
@@ -540,7 +529,6 @@ export function RoomPage() {
   const [facClearPw, setFacClearPw] = useState(false);
   const [facSaving, setFacSaving] = useState(false);
   const [facMsg, setFacMsg] = useState<string | null>(null);
-  const [guestName, setGuestNameState] = useState("");
   const [editDrafts, setEditDrafts] = useState<Record<string, string>>({});
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [stickerEditorMono, setStickerEditorMono] = useState(false);
@@ -563,7 +551,7 @@ export function RoomPage() {
   const [planeShapes, setPlaneShapes] = useState<PlaneShapeDto[]>([]);
   const [cardStyles, setCardStyles] = useState<Record<string, { backgroundColor?: string }>>({});
   const [blockStyles, setBlockStyles] = useState<Record<string, { backgroundColor?: string }>>({});
-  const [profileFx, setProfileFx] = useState<UserProfilePrefs>(() => loadProfilePrefs());
+  const { prefs: profilePrefs } = useProfilePrefsSync();
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [planeToolsOpen, setPlaneToolsOpen] = useState(false);
   const [selectedMemeId, setSelectedMemeId] = useState<string | null>(null);
@@ -820,22 +808,10 @@ export function RoomPage() {
   }, [room?.status, room?.id, slug]);
 
   useEffect(() => {
-    setGuestNameState(getGuestName());
     setParticipantKey(getOrCreateParticipantKey());
   }, []);
 
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "retrogen_profile_v1") setProfileFx(loadProfilePrefs());
-    };
-    const onLocal = () => setProfileFx(loadProfilePrefs());
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("retrogen-profile", onLocal);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("retrogen-profile", onLocal);
-    };
-  }, []);
+  const roomActor = useMemo(() => buildRoomActorProfile(profilePrefs, authMe), [profilePrefs, authMe]);
 
   const themePack = room?.themePack;
   const boardFrozen = room?.status === "ended";
@@ -1852,7 +1828,7 @@ export function RoomPage() {
   ) {
     if (!slug || !room || boardFrozen) return;
     const text = (initialText ?? "").trim();
-    const name = guestName.trim() || "Гость";
+    const name = roomActor.name;
     const tmpId = `tmp-${Date.now()}`;
     const now = new Date().toISOString();
     const optimistic: RoomDto["cards"][number] = {
@@ -1950,7 +1926,7 @@ export function RoomPage() {
     const hasContent = htmlToPlainText(nextText).length > 0;
     const prevText = card.text;
     const prevTextDoc = card.textDoc ?? null;
-    const nextAuthor = hasContent ? card.authorDisplayName ?? (guestName.trim() || "Гость") : card.authorDisplayName;
+    const nextAuthor = hasContent ? card.authorDisplayName ?? roomActor.name : card.authorDisplayName;
     setRoom((prev) =>
       prev
         ? {
@@ -2207,7 +2183,7 @@ export function RoomPage() {
 
   async function setWarmupOption(optionId: string) {
     if (!slug || !room || !participantKey || boardFrozen) return;
-    const voterName = (guestName.trim() || "Гость").slice(0, 80);
+    const voterName = roomActor.name.slice(0, 80);
     const snapshot = room.warmupVotes;
     const existing = room.warmupVotes.find((w) => w.voterKey === participantKey);
     const optimistic: RoomDto["warmupVotes"][number] = existing
@@ -3004,20 +2980,18 @@ export function RoomPage() {
   }
 
   const actorMentionIds = useMemo(
-    () => currentActorMentionIds(authMe, guestName),
-    [authMe, guestName],
+    () => currentActorMentionIds(authMe, roomActor.name),
+    [authMe, roomActor.name],
   );
-  const actorDisplayName = useMemo(
-    () => currentActorDisplayName(authMe, guestName),
-    [authMe, guestName],
-  );
+  const actorDisplayName = roomActor.name;
+  const actorDisplayLabel = roomActor.label;
 
   const stickerCollabUser = useMemo(
     () => ({
-      name: stickerCollabUserLabel(actorDisplayName, participantKey),
-      color: stickerCollabUserColor(participantKey || guestName || "local"),
+      name: stickerCollabUserLabel(actorDisplayLabel, participantKey),
+      color: stickerCollabUserColor(participantKey || roomActor.name || "local"),
     }),
-    [actorDisplayName, participantKey, guestName],
+    [actorDisplayLabel, participantKey, roomActor.name],
   );
 
   const stickerCollabProvider = useStickerCollab(
@@ -3034,10 +3008,10 @@ export function RoomPage() {
   const mentionCandidatesLive = useMemo(() => {
     if (!room || !mentionSuggest) return [] as MentionCandidate[];
     return filterMentionCandidates(
-      buildMentionCandidatesFromRoom(room, authMe, guestName),
+      buildMentionCandidatesFromRoom(room, authMe, roomActor.name),
       mentionSuggest.query,
     );
-  }, [room, authMe, guestName, mentionSuggest]);
+  }, [room, authMe, roomActor.name, mentionSuggest]);
 
   useEffect(() => {
     if (!editingCardId) {
@@ -4149,22 +4123,22 @@ export function RoomPage() {
       className="relative flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden overscroll-none"
       style={{
         background: (() => {
-          const backdrop = effectiveBoardBackdrop(profileFx.boardBackdrop, profileFx.avatarDataUrl);
+          const backdrop = effectiveBoardBackdrop(profilePrefs.boardBackdrop, profilePrefs.avatarDataUrl);
           return backdrop
             ? backdrop
             : isLight
               ? "linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)"
               : `linear-gradient(180deg, ${palette.bg} 0%, #0a0d12 100%)`;
         })(),
-        cursor: cursorCss(profileFx.cursorStyle),
+        cursor: cursorCss(profilePrefs.cursorStyle),
       }}
     >
-      {effectiveBoardWallpaper(profileFx) ? (
+      {effectiveBoardWallpaper(profilePrefs) ? (
         <div
           className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: `url(${effectiveBoardWallpaper(profileFx)})`,
-            opacity: wallpaperOpacityFraction(profileFx.wallpaperOpacity),
+            backgroundImage: `url(${effectiveBoardWallpaper(profilePrefs)})`,
+            opacity: wallpaperOpacityFraction(profilePrefs.wallpaperOpacity),
           }}
           aria-hidden
         />
@@ -4265,7 +4239,7 @@ export function RoomPage() {
         className={`relative z-30 shrink-0 border-b px-6 py-4 backdrop-blur ${
           isLight ? "border-zinc-300 bg-white/70" : "border-white/10 bg-black/20"
         }`}
-        style={profileFx.headerTint ? { backgroundColor: profileFx.headerTint } : undefined}
+        style={profilePrefs.headerTint ? { backgroundColor: profilePrefs.headerTint } : undefined}
       >
         <div className="mx-auto flex max-w-5xl flex-wrap items-end justify-between gap-4">
           <div className="min-w-0 flex-1">
@@ -4451,6 +4425,7 @@ export function RoomPage() {
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <RoomActorIdentityChip actor={roomActor} isLight={isLight} />
             <ThemeCornersIconButtons
               isLight={isLight}
               isRounded={isRounded}
