@@ -3,6 +3,7 @@ import type { CloudSyncState } from "../../lib/profileCloudSync";
 import type { AuthUserDto } from "../../api";
 import type { UserProfilePrefs } from "../../lib/profilePrefs";
 import type { VisitedRoomEntry } from "../../lib/roomLobbyPrefs";
+import type { CSSProperties } from "react";
 import type { ProfileDesign } from "./profileDesign";
 import type { ProfileSectionId } from "./profileHubTheme";
 import { ProfileRoomPanel } from "./ProfileRoomPanel";
@@ -38,6 +39,7 @@ export type ProfilePanelsProps = {
   onRetryCloudSync?: () => void;
   avatarSrc?: string | null;
   wallpaperSrc?: string | null;
+  themeStyle: CSSProperties;
 };
 
 export function ProfileSectionPanels({
@@ -61,6 +63,7 @@ export function ProfileSectionPanels({
   onRetryCloudSync,
   avatarSrc,
   wallpaperSrc,
+  themeStyle,
 }: ProfilePanelsProps) {
   if (section === "overview") {
     return (
@@ -112,7 +115,7 @@ export function ProfileSectionPanels({
   }
 
   if (section === "notepad") {
-    return <ProfileNotepadPanel d={d} prefs={prefs} setPrefs={setPrefs} />;
+    return <ProfileNotepadPanel d={d} prefs={prefs} setPrefs={setPrefs} themeStyle={themeStyle} />;
   }
 
   if (section === "notifications") {

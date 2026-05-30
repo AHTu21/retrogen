@@ -163,6 +163,63 @@ html:is(.corners-rounded, .corners-sharp) :where(
   pointer-events: none;
 }
 
+/* Блокнот профиля (TipTap) */
+.profile-notepad-tiptap .ProseMirror {
+  outline: none;
+  min-height: 12rem;
+}
+
+.profile-notepad-tiptap .ProseMirror p {
+  margin: 0.2em 0;
+}
+
+.profile-notepad-tiptap .ProseMirror h2 {
+  margin: 0.5em 0 0.25em;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.profile-notepad-tiptap .ProseMirror ul,
+.profile-notepad-tiptap .ProseMirror ol {
+  margin: 0.25em 0;
+  padding-left: 1.35em;
+}
+
+.profile-notepad-tiptap .ProseMirror li p {
+  margin: 0;
+}
+
+.profile-notepad-tiptap .ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5em 0;
+}
+
+.profile-notepad-tiptap .ProseMirror td,
+.profile-notepad-tiptap .ProseMirror th {
+  border: 1px solid color-mix(in srgb, var(--ph-muted) 35%, transparent);
+  padding: 4px 8px;
+  vertical-align: top;
+  min-width: 4rem;
+}
+
+.profile-notepad-tiptap .ProseMirror th {
+  background: color-mix(in srgb, var(--ph-surface-elevated) 80%, transparent);
+  font-weight: 600;
+}
+
+.profile-notepad-tiptap .ProseMirror blockquote {
+  margin: 0.35em 0;
+  padding-left: 0.75em;
+  border-left: 3px solid var(--ph-accent);
+  opacity: 0.92;
+}
+
+.profile-notepad-tiptap .ProseMirror .is-empty::before {
+  color: var(--ph-muted);
+  opacity: 0.75;
+}
+
 @keyframes messenger-modal-fade-in {
   from {
     opacity: 0;

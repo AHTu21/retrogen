@@ -21,6 +21,8 @@ import { useAppCorners, useAppTheme } from "../theme";
 import { createProfileDesign } from "./profile/profileDesign";
 import { ProfileSidebar } from "./profile/ProfileSidebar";
 import { ProfileSectionPanels } from "./profile/ProfileSectionPanels";
+import { buildProfileHelpBody, profileHelpTitle } from "./profile/profileHelpBody";
+import { useProfileHideTips } from "../lib/useProfileHideTips";
 import {
   DEFAULT_PROFILE_SECTION,
   parseProfileHash,
@@ -280,22 +282,19 @@ export function ProfilePage() {
     });
   }
 
-  const profileHelpBody = (
-    <>
-      <p className="opacity-90">
-        Центр настроек в стиле System Settings: слева профиль и разделы, справа — формы. Изменения сохраняются в браузере
-        автоматически.
-      </p>
-      <p className="mt-3 opacity-90">
-        Автосохранение в браузере и синхронизация с аккаунтом после входа. Экспорт JSON — в «Безопасность». Навигация: Alt+↑/↓.
-      </p>
-    </>
+  const { hideTips, setHideTips } = useProfileHideTips();
+
+  const profileHelpBody = useMemo(
+    () => buildProfileHelpBody(section, hideTips, setHideTips),
+    [section, hideTips, setHideTips],
   );
+
+  const helpTitle = useMemo(() => profileHelpTitle(section), [section]);
 
   return (
     <RetrogenDockableHelpRoot
       isLight={isLight}
-      title="Справка: профиль"
+      title={helpTitle}
       onHelpOpenCloseAbout={() => setAboutOpen(false)}
       body={profileHelpBody}
     >
@@ -447,6 +446,7 @@ export function ProfilePage() {
                   onRetryCloudSync={retryCloudSync}
                   avatarSrc={avatarSrc}
                   wallpaperSrc={wallpaperSrc}
+                  themeStyle={accentStyle}
                 />
               </div>
             </main>

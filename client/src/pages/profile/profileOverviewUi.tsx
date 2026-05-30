@@ -9,6 +9,7 @@ import {
 import {
   resolveProfileNotificationEmail,
 } from "../../lib/profileNotificationPrefs";
+import { notepadPlainText } from "../../lib/profileNotepadContent";
 import type { UserProfilePrefs } from "../../lib/profilePrefs";
 import { effectiveBoardWallpaper } from "../../lib/profilePrefs";
 import type { VisitedRoomEntry } from "../../lib/roomLobbyPrefs";
@@ -110,7 +111,7 @@ export function buildOverviewHubItems(
       : prefs.boardBackdrop.trim()
         ? "Свой фон"
         : "По умолчанию";
-  const notepadWords = prefs.notepad.trim().split(/\s+/).filter(Boolean).length;
+  const notepadWords = notepadPlainText(prefs.notepad).trim().split(/\s+/).filter(Boolean).length;
   const notepadValue = notepadWords ? `${notepadWords} слов` : "Пусто";
   const notifyEmail = resolveProfileNotificationEmail(prefs.profileEmail, authUser?.email ?? undefined);
   const notifyOn = [

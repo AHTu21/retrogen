@@ -1,4 +1,5 @@
 import type { AuthUserDto } from "../api";
+import { notepadPlainText } from "./profileNotepadContent";
 import type { UserProfilePrefs } from "./profilePrefs";
 import { effectiveBoardWallpaper } from "./profilePrefs";
 import { resolveProfileNotificationEmail } from "./profileNotificationPrefs";
@@ -33,7 +34,7 @@ export function buildProfileCompletionTasks(
     { id: "contact", label: "Email или контакт", done: !!shownEmail, section: "identity" },
     { id: "status", label: "Эмодзи-статус", done: !!prefs.emojiStatus.trim(), section: "identity" },
     { id: "room", label: "Оформление доски", done: hasBoardStyle, section: "room" },
-    { id: "notepad", label: "Заметки в блокноте", done: !!prefs.notepad.trim(), section: "notepad" },
+    { id: "notepad", label: "Заметки в блокноте", done: !!notepadPlainText(prefs.notepad).trim(), section: "notepad" },
   ];
 
   if (authUser) {

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "@tiptap/extension-collaboration": "^3.23.6",
@@ -38,6 +39,8 @@
     "yjs": "^13.6.30"
   },
   "devDependencies": {
+    "happy-dom": "^17.4.4",
+    "vitest": "^3.2.4",
     "@tailwindcss/vite": "^4.0.0",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
