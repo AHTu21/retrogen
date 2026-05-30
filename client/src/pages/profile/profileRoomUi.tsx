@@ -1,4 +1,4 @@
-import { useCallback, useState, type DragEvent, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type DragEvent, type ReactNode } from "react";
 import type { ProfileAccentPreset } from "../../lib/profileAccent";
 import { DEFAULT_WALLPAPER_OPACITY, cursorCss, effectiveBoardWallpaper, type CursorStyle, type UserProfilePrefs } from "../../lib/profilePrefs";
 import {
@@ -7,7 +7,7 @@ import {
   roomPaletteContrastHint,
 } from "../../lib/profileRoomColors";
 import type { ProfileDesign } from "./profileDesign";
-import { ROOM_THEME_PRESETS, roomPresetMatches, type RoomThemePreset } from "./profileRoomPresets";
+import { ROOM_THEME_PRESETS, ROOM_THEME_TONE_LABELS, roomPresetIsLightBoard, roomPresetMatches, sortRoomPresets, type RoomThemePreset, type RoomThemeTone } from "./profileRoomPresets";
 import { BoardPreviewPanel, ProfileCard } from "./profileUi";
 
 const CURSOR_OPTIONS: {
@@ -170,6 +170,8 @@ function PreviewLegendChip({ label, color }: { label: string; color: string }) {
   );
 }
 
+const TONE_FILTER_IDS: RoomThemeTone[] = ["light", "vivid", "dark"];
+
 export function RoomQuickThemes({
   d,
   boardBackdrop,
@@ -181,56 +183,125 @@ export function RoomQuickThemes({
   headerTint: string;
   onApply: (preset: RoomThemePreset) => void;
 }) {
+  const [toneFilter, setToneFilter] = useState<RoomThemeTone | "all">("all");
+
+  const activePresetId = useMemo(() => {
+    const hit = ROOM_THEME_PRESETS.find((p) =>
+      roomPresetMatches(p, boardBackdrop, headerTint, normalizeBoardBackdropColor, normalizeHeaderTintColor),
+    );
+    return hit?.id ?? null;
+  }, [boardBackdrop, headerTint]);
+
+  const filtered = useMemo(() => {
+    const list =
+      toneFilter === "all" ? ROOM_THEME_PRESETS : ROOM_THEME_PRESETS.filter((p) => p.tone === toneFilter);
+    return toneFilter === "all" ? sortRoomPresets(list) : list;
+  }, [toneFilter]);
+
   return (
     <section className="space-y-2">
       <div className="px-0.5">
         <h2 className={d.groupTitle}>Готовые темы</h2>
-        <p className={d.groupDesc}>Один клик — фон, шапка и при необходимости курсор</p>
+        <p className={d.groupDesc}>Фон доски и шапка — один клик</p>
       </div>
-      <div className={`grid grid-cols-2 gap-2 sm:grid-cols-3 ${d.insetGroup} p-2.5 sm:p-3`}>
-        {ROOM_THEME_PRESETS.map((preset) => {
-          const active = roomPresetMatches(
-            preset,
-            boardBackdrop,
-            headerTint,
-            normalizeBoardBackdropColor,
-            normalizeHeaderTintColor,
-          );
-          return (
-            <button
+
+      <div className={`overflow-hidden ${d.insetGroup}`}>
+        <div className="flex flex-wrap gap-1.5 border-b border-[var(--ph-separator)] px-3 py-2.5 sm:px-3.5">
+          {(["all", ...TONE_FILTER_IDS] as const).map((id) => {
+            const active = toneFilter === id;
+            const label = id === "all" ? "Все" : ROOM_THEME_TONE_LABELS[id];
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setToneFilter(id)}
+                className={`rounded-full px-3 py-1 text-[0.6875rem] font-medium transition ${
+                  active
+                    ? "bg-[var(--ph-nav-active-bg)] text-[var(--ph-nav-active-text)]"
+                    : "text-[var(--ph-muted)] hover:bg-[var(--ph-nav-hover)] hover:text-[var(--ph-text)]"
+                }`}
+                aria-pressed={active}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 p-2.5 sm:grid-cols-3 sm:p-3">
+          {filtered.map((preset) => (
+            <RoomThemeCard
               key={preset.id}
-              type="button"
-              onClick={() => onApply(preset)}
-              className={`flex w-full min-w-0 flex-col overflow-hidden border text-left transition ${d.rSm} ${
-                active
-                  ? "border-2 border-[var(--ph-accent)] bg-[var(--ph-nav-active-bg)]"
-                  : "border border-[var(--ph-border)] bg-[var(--ph-surface-elevated)] hover:bg-[var(--ph-nav-hover)]"
-              }`}
-              aria-pressed={active}
-            >
-              <div className="relative h-[3.25rem] w-full" style={{ background: preset.boardBackdrop }}>
-                <div
-                  className="absolute inset-x-0 top-0 h-[38%] border-b border-black/10"
-                  style={{ background: preset.headerTint }}
-                />
-                <div className="absolute inset-x-2 bottom-2 flex gap-0.5">
-                  {[0, 1, 2].map((i) => (
-                    <div
-                      key={i}
-                      className="h-4 flex-1 rounded-sm bg-white/75 ring-1 ring-black/8 dark:bg-zinc-900/70 dark:ring-white/10"
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="border-t border-[var(--ph-separator)] px-2.5 py-2">
-                <p className="text-[0.75rem] font-semibold text-[var(--ph-text)]">{preset.label}</p>
-                <p className={`mt-0.5 line-clamp-2 text-[0.625rem] leading-snug ${d.muted}`}>{preset.description}</p>
-              </div>
-            </button>
-          );
-        })}
+              d={d}
+              preset={preset}
+              active={activePresetId === preset.id}
+              onApply={onApply}
+            />
+          ))}
+        </div>
+
+        {filtered.length === 0 ? (
+          <p className={`border-t border-[var(--ph-separator)] px-3 py-4 text-center text-[0.8125rem] ${d.muted}`}>
+            Нет тем в этой категории
+          </p>
+        ) : null}
       </div>
     </section>
+  );
+}
+
+function RoomThemeCard({
+  d,
+  preset,
+  active,
+  onApply,
+}: {
+  d: ProfileDesign;
+  preset: RoomThemePreset;
+  active: boolean;
+  onApply: (preset: RoomThemePreset) => void;
+}) {
+  const isLight = roomPresetIsLightBoard(preset.boardBackdrop);
+  const columnClass = isLight
+    ? "bg-white/90 ring-1 ring-black/8"
+    : "bg-zinc-100/95 ring-1 ring-white/15";
+
+  return (
+    <button
+      type="button"
+      onClick={() => onApply(preset)}
+      className={`flex w-full min-w-0 flex-col overflow-hidden text-left transition ${d.rSm} ${
+        active
+          ? "ring-2 ring-[var(--ph-accent)]"
+          : "ring-1 ring-[var(--ph-border)] hover:ring-[var(--ph-accent)]/40"
+      }`}
+      aria-pressed={active}
+      title={preset.description}
+    >
+      <div className="relative h-12 w-full shrink-0" style={{ background: preset.boardBackdrop }}>
+        <div
+          className="absolute inset-x-0 top-0 h-[38%] border-b border-black/10"
+          style={{ background: preset.headerTint }}
+        />
+        <div className="absolute inset-x-2 bottom-1.5 flex gap-0.5">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className={`h-3.5 flex-1 rounded-sm ${columnClass}`} />
+          ))}
+        </div>
+        {active ? (
+          <span
+            className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--ph-accent)] text-[0.625rem] font-bold text-white"
+            aria-hidden
+          >
+            ✓
+          </span>
+        ) : null}
+      </div>
+      <div className="flex min-h-[2.75rem] flex-col justify-center border-t border-[var(--ph-separator)] bg-[var(--ph-surface-elevated)] px-2 py-1.5 sm:px-2.5">
+        <p className="truncate text-[0.75rem] font-medium text-[var(--ph-text)]">{preset.label}</p>
+        <p className={`mt-0.5 line-clamp-1 text-[0.625rem] leading-snug ${d.muted}`}>{preset.description}</p>
+      </div>
+    </button>
   );
 }
 
