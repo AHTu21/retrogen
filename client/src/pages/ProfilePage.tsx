@@ -5,12 +5,13 @@ import { RetrogenDockableHelpRoot, RetrogenDockableHelpToggle } from "../compone
 import { RetrogenOverflowMenu } from "../components/RetrogenOverflowMenu";
 import { MessengerNavIconButton } from "../components/MessengerNavIconButton";
 import { ThemeCornersIconButtons } from "../components/ThemeCornersIconButtons";
-import { fetchAuthMe, logoutAccount, updateAuthDisplayName, type AuthUserDto } from "../api";
+import { fetchAuthMe, logoutAccount, type AuthUserDto } from "../api";
 import { applyProfileBackup, downloadProfileBackup, parseProfileBackup } from "../lib/profileBackup";
 import { profileAccentCssVars } from "../lib/profileAccent";
 import { MAX_WALLPAPER_CHARS, type UserProfilePrefs } from "../lib/profilePrefs";
 import { useLobbyPrefsSync } from "../lib/useLobbyPrefsSync";
 import { useProfilePrefsDraft } from "../lib/useProfilePrefsDraft";
+import { useProfileCloudSync } from "../lib/useProfileCloudSync";
 import { useAppCorners, useAppTheme } from "../theme";
 import { createProfileDesign } from "./profile/profileDesign";
 import { ProfileSidebar } from "./profile/ProfileSidebar";
@@ -35,31 +36,16 @@ export function ProfilePage() {
     typeof window !== "undefined" ? parseProfileHash() : DEFAULT_PROFILE_SECTION,
   );
   const authSeededRef = useRef(false);
-  const nameSyncRef = useRef<string | null>(null);
   const [authUser, setAuthUser] = useState<AuthUserDto | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
 
-  const syncDisplayNameToAuth = useCallback(
-    (safe: UserProfilePrefs) => {
-      const trimmed = safe.displayName.trim();
-      if (authUser && trimmed && trimmed !== authUser.displayName && nameSyncRef.current !== trimmed) {
-        nameSyncRef.current = trimmed;
-        void updateAuthDisplayName(trimmed)
-          .then((user) => {
-            setAuthUser(user);
-            nameSyncRef.current = null;
-          })
-          .catch(() => {
-            nameSyncRef.current = null;
-          });
-      }
-    },
-    [authUser],
-  );
+  const scheduleCloudPushRef = useRef<(safe: UserProfilePrefs) => void>(() => {});
 
   const {
     prefs,
     setPrefs,
+    isDirty,
+    validationBlocked,
     saveError,
     saveStatus,
     commit,
@@ -68,8 +54,24 @@ export function ProfilePage() {
   } = useProfilePrefsDraft({
     autosaveMs: 450,
     blockOnIdentityErrors: true,
-    onAfterCommit: syncDisplayNameToAuth,
+    onAfterCommit: (safe) => {
+      scheduleCloudPushRef.current(safe);
+    },
   });
+
+  const { cloudSyncLabel, cloudSyncState, cloudSyncMeta, scheduleCloudPush, retryCloudSync } =
+    useProfileCloudSync({
+      authUser,
+      prefs,
+      isDirty,
+      validationBlocked,
+      onMergedFromCloud: (merged, hint) => {
+        replacePrefs(merged, hint);
+      },
+      onAuthUserUpdated: setAuthUser,
+    });
+
+  scheduleCloudPushRef.current = scheduleCloudPush;
 
   const accentStyle = useMemo(
     () => profileAccentCssVars(prefs.profileAccent, isLight),
@@ -178,14 +180,14 @@ export function ProfilePage() {
           }
           const safe = applyProfileBackup(parsed);
           replacePrefs(safe, "Импортировано");
-          syncDisplayNameToAuth(safe);
+          scheduleCloudPush(safe);
         } catch {
           window.alert("Не удалось прочитать файл.");
         }
       };
       reader.readAsText(file);
     },
-    [replacePrefs, syncDisplayNameToAuth],
+    [replacePrefs, scheduleCloudPush],
   );
 
   function readImageFile(f: File | undefined, onUrl: (url: string) => void) {
@@ -229,8 +231,7 @@ export function ProfilePage() {
         автоматически.
       </p>
       <p className="mt-3 opacity-90">
-        Автосохранение в браузере. Имя при входе подставляется из аккаунта; экспорт JSON — в «Безопасность». Разделы «Уведомления»,
-        «Организация» и «Тариф» доступны после входа (корпоративные — предпросмотр). Навигация: Alt+↑/↓ по разделам.
+        Автосохранение в браузере и синхронизация с аккаунтом после входа. Экспорт JSON — в «Безопасность». Навигация: Alt+↑/↓.
       </p>
     </>
   );
@@ -254,6 +255,21 @@ export function ProfilePage() {
               </p>
             </Link>
             <div className="flex flex-wrap items-center gap-2.5">
+              {cloudSyncLabel ? (
+                <span
+                  className={
+                    cloudSyncState.kind === "error"
+                      ? d.savePillWarn
+                      : cloudSyncState.kind === "synced"
+                        ? d.savePillActive
+                        : d.savePill
+                  }
+                  role="status"
+                  aria-live="polite"
+                >
+                  {cloudSyncLabel}
+                </span>
+              ) : null}
               {saveStatus ? (
                 <span
                   className={
@@ -353,6 +369,10 @@ export function ProfilePage() {
                   }}
                   onExportBackup={onExportBackup}
                   onImportBackup={onImportBackup}
+                  cloudSyncLabel={cloudSyncLabel}
+                  cloudSyncState={cloudSyncState}
+                  cloudSyncMeta={cloudSyncMeta}
+                  onRetryCloudSync={retryCloudSync}
                 />
               </div>
             </main>

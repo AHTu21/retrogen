@@ -2,6 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { getJwtSecret } from "./config.js";
 import { signAccessToken, verifyAccessToken } from "./jwt.js";
+import {
+  mergeCloudProfilePatch,
+  parseCloudProfileV1,
+  type CloudProfilePatch,
+} from "./profileJson.js";
 import { hashPassword, verifyPassword } from "./password.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -25,6 +30,10 @@ export async function getBearerUser(req: { headers: { authorization?: string } }
     select: { id: true, email: true, displayName: true, globalRole: true },
   });
   if (!user) return null;
+  return { id: user.id, email: user.email, displayName: user.displayName, globalRole: user.globalRole };
+}
+
+function toAuthUserDto(user: { id: string; email: string; displayName: string; globalRole: string }) {
   return { id: user.id, email: user.email, displayName: user.displayName, globalRole: user.globalRole };
 }
 
@@ -104,12 +113,50 @@ export function registerAuthRoutes(app: FastifyInstance) {
       select: { id: true, email: true, displayName: true, globalRole: true },
     });
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        displayName: user.displayName,
-        globalRole: user.globalRole,
+      user: toAuthUserDto(user),
+    };
+  });
+
+  app.get("/api/auth/me/profile", async (req, reply) => {
+    const u = await getBearerUser(req);
+    if (!u) return reply.code(401).send({ error: "unauthorized" });
+    const row = await prisma.user.findUnique({
+      where: { id: u.id },
+      select: { profileJson: true },
+    });
+    const profile = parseCloudProfileV1(row?.profileJson ?? null);
+    return { profile };
+  });
+
+  app.patch<{ Body: CloudProfilePatch }>("/api/auth/me/profile", async (req, reply) => {
+    const u = await getBearerUser(req);
+    if (!u) return reply.code(401).send({ error: "unauthorized" });
+    const body = req.body ?? {};
+    if (!body || typeof body !== "object") {
+      return reply.code(400).send({ error: "invalid_body" });
+    }
+
+    const row = await prisma.user.findUnique({
+      where: { id: u.id },
+      select: { profileJson: true, displayName: true },
+    });
+    const current = parseCloudProfileV1(row?.profileJson ?? null);
+    const merged = mergeCloudProfilePatch(current, body);
+
+    const displayName = merged.identity.displayName;
+    const user = await prisma.user.update({
+      where: { id: u.id },
+        data: {
+        profileJson: merged,
+        ...(displayName !== row?.displayName ? { displayName } : {}),
       },
+      select: { id: true, email: true, displayName: true, globalRole: true, profileJson: true },
+    });
+
+    const profile = parseCloudProfileV1(user.profileJson ?? null);
+    return {
+      profile,
+      user: toAuthUserDto(user),
     };
   });
 }

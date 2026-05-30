@@ -1,3 +1,5 @@
+import type { CloudProfileMeta } from "../../lib/profileCloudPayload";
+import type { CloudSyncState } from "../../lib/profileCloudSync";
 import type { AuthUserDto } from "../../api";
 import type { UserProfilePrefs } from "../../lib/profilePrefs";
 import type { VisitedRoomEntry } from "../../lib/roomLobbyPrefs";
@@ -30,6 +32,10 @@ export type ProfilePanelsProps = {
   onGoSection: (id: ProfileSectionId) => void;
   onExportBackup: () => void;
   onImportBackup: (file: File | undefined) => void;
+  cloudSyncLabel?: string | null;
+  cloudSyncState?: CloudSyncState;
+  cloudSyncMeta?: CloudProfileMeta;
+  onRetryCloudSync?: () => void;
 };
 
 export function ProfileSectionPanels({
@@ -47,6 +53,10 @@ export function ProfileSectionPanels({
   onGoSection,
   onExportBackup,
   onImportBackup,
+  cloudSyncLabel,
+  cloudSyncState,
+  cloudSyncMeta,
+  onRetryCloudSync,
 }: ProfilePanelsProps) {
   if (section === "overview") {
     return (
@@ -63,7 +73,16 @@ export function ProfileSectionPanels({
   }
 
   if (section === "identity") {
-    return <ProfileIdentityPanel d={d} prefs={prefs} setPrefs={setPrefs} authUser={authUser} />;
+    return (
+      <ProfileIdentityPanel
+        d={d}
+        prefs={prefs}
+        setPrefs={setPrefs}
+        authUser={authUser}
+        onGoSection={onGoSection}
+        cloudSyncLabel={cloudSyncLabel}
+      />
+    );
   }
 
   if (section === "room") {
@@ -110,6 +129,10 @@ export function ProfileSectionPanels({
         onLogout={onLogout}
         onExportBackup={onExportBackup}
         onImportBackup={onImportBackup}
+        cloudSyncLabel={cloudSyncLabel}
+        cloudSyncState={cloudSyncState}
+        cloudSyncMeta={cloudSyncMeta}
+        onRetryCloudSync={onRetryCloudSync}
       />
     );
   }

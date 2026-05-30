@@ -133,8 +133,8 @@ export function ProfileNotificationsPanel({ d, prefs, setPrefs, authUser, onGoSe
         <div className={`${d.noticeInfo} px-4 py-3 text-[0.8125rem] leading-relaxed ${d.rSm}`}>
           <p className="font-medium">Как это работает сейчас</p>
           <p className="mt-1 opacity-90">
-            Настройки сохраняются в этом браузере вместе с профилем. Отправка писем с сервера появится в следующем
-            релизе — ваш выбор уже будет учтён.
+            Настройки сохраняются в этом браузере и синхронизируются с аккаунтом после входа. Отправка писем с сервера
+            появится в следующем релизе — ваш выбор уже будет учтён.
           </p>
         </div>
       </div>

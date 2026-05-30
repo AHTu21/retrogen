@@ -82,11 +82,12 @@ components/room/           — UI комнаты, связанный с проф
 | `#notifications` | **MVP** — toggles в sidebar, prefs в `profilePrefs.notifications` |
 | `#organization`, `#billing` | **Preview** — UI-панели (roadmap-функции, тарифы); backend Team+ позже |
 
-### Фаза E — Cloud sync (бэклог)
+### Фаза E — Cloud sync ✅ (MVP)
 
-- PATCH `/api/me/profile` — notepad, room theme, identity
-- Merge strategy: server wins vs local draft
-- GDPR export через API
+- `GET/PATCH /api/auth/me/profile` — identity, notepad, room theme, notifications в `User.profileJson`
+- Клиент: `profileCloudPayload`, `profileCloudSync`, `useProfileCloudSync` в ProfilePage
+- Merge: при входе server → local (если нет грязного черновика); autosave → push debounce 900 ms
+- **Локально только:** avatar data URL, wallpaper data URL, lobby history
 
 ---
 
@@ -113,3 +114,4 @@ components/room/           — UI комнаты, связанный с проф
 |--------|------------|
 | 0.15.0 | Foundation: completion, emoji, lobby events |
 | 0.16.0 | Notifications MVP, org/billing preview, room identity bridge, useProfilePrefsDraft |
+| 0.17.0 | Cloud profile sync API + identity/security polish |

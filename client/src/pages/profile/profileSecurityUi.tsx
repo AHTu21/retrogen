@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import type { AuthUserDto } from "../../api";
+import type { CloudProfileMeta } from "../../lib/profileCloudPayload";
+import type { CloudSyncState } from "../../lib/profileCloudSync";
 import type { ProfileDesign } from "./profileDesign";
 
 export function authRoleLabel(globalRole: string): string {
@@ -46,8 +48,8 @@ export function SecurityHero({ d, authUser }: { d: ProfileDesign; authUser: Auth
           </h2>
           <p className={`mt-2 text-[0.8125rem] leading-relaxed ${d.muted}`}>
             {signedIn
-              ? "Управляйте входом и сессией. Имя в комнате сохраняется в аккаунт; остальные настройки — в этом браузере до облачной синхронизации."
-              : "Войдите, чтобы привязать профиль к email и открыть корпоративные функции защиты."}
+              ? "Управляйте входом и сессией. Личные данные, блокнот и оформление доски синхронизируются с аккаунтом; аватар и обои — в этом браузере."
+              : "Войдите, чтобы привязать профиль к email и синхронизировать настройки между устройствами."}
           </p>
         </div>
         <span
@@ -145,7 +147,14 @@ const SECURITY_FEATURES: SecurityFeature[] = [
     id: "local",
     icon: "💾",
     title: "Локальный профиль",
-    description: "Блокнот, аватар и темы комнаты сохраняются в localStorage этого браузера.",
+    description: "Аватар, обои доски и история лобби остаются в localStorage этого браузера.",
+    status: "active",
+  },
+  {
+    id: "cloud",
+    icon: "☁",
+    title: "Облачный профиль",
+    description: "Имя, блокнот, тема комнаты и уведомления синхронизируются с сервером после входа.",
     status: "active",
   },
   {
@@ -164,6 +173,73 @@ const SECURITY_FEATURES: SecurityFeature[] = [
   },
 ];
 
+export function SecurityCloudSyncCard({
+  d,
+  authUser,
+  label,
+  state,
+  meta,
+  onRetry,
+}: {
+  d: ProfileDesign;
+  authUser: AuthUserDto | null;
+  label?: string | null;
+  state?: CloudSyncState;
+  meta?: CloudProfileMeta;
+  onRetry?: () => void;
+}) {
+  if (!authUser) return null;
+
+  const synced = state?.kind === "synced" || meta?.lastPushedAt || meta?.serverUpdatedAt;
+  const errored = state?.kind === "error";
+
+  return (
+    <section className="space-y-2">
+      <div className="px-0.5">
+        <h2 className={d.groupTitle}>Облачная синхронизация</h2>
+        <p className={d.groupDesc}>Настройки профиля на сервере — подтягиваются при входе на новом устройстве</p>
+      </div>
+      <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${d.insetGroup} p-4 sm:p-5`}>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[0.9375rem] font-semibold text-[var(--ph-text)]">
+              {label ?? (synced ? "Синхронизировано" : "Ожидание")}
+            </p>
+            <span
+              className={`px-2 py-0.5 text-[0.625rem] font-semibold uppercase ${d.rFull} ${
+                errored
+                  ? "bg-red-500/12 text-red-700 dark:text-red-300"
+                  : synced
+                    ? d.badgeLive
+                    : d.badgePreview
+              }`}
+            >
+              {errored ? "Ошибка" : synced ? "Активно" : "Синхронизация"}
+            </span>
+          </div>
+          <p className={`mt-1 max-w-md text-[0.8125rem] leading-relaxed ${d.muted}`}>
+            В облаке: имя, контакты, блокнот, тема комнаты, уведомления. Локально: аватар, обои, избранное лобби.
+            {meta?.serverUpdatedAt ? ` Последнее обновление на сервере: ${formatCloudDate(meta.serverUpdatedAt)}.` : null}
+          </p>
+        </div>
+        {errored && onRetry ? (
+          <button type="button" className={`${d.btnSecondary} shrink-0`} onClick={onRetry}>
+            Повторить
+          </button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function formatCloudDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    return iso;
+  }
+}
+
 export function SecurityDataPortability({
   d,
   onExport,
@@ -178,7 +254,7 @@ export function SecurityDataPortability({
       <div className="px-0.5">
         <h2 className={d.groupTitle}>Резервная копия настроек</h2>
         <p className={d.groupDesc}>
-          Экспорт и импорт JSON — профиль, блокнот, оформление доски, история лобби в этом браузере
+          Экспорт JSON — полная копия включая аватар и лобби; облако — текстовые настройки профиля без data URL
         </p>
       </div>
       <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${d.insetGroup} p-4 sm:p-5`}>

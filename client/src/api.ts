@@ -449,6 +449,67 @@ export async function updateAuthDisplayName(displayName: string): Promise<AuthUs
   return data.user;
 }
 
+export type CloudProfileV1Dto = {
+  v: 1;
+  updatedAt: string;
+  identity: {
+    displayName: string;
+    profileEmail: string;
+    signature: string;
+    roleTitle: string;
+    teamName: string;
+    pronouns: string;
+    city: string;
+    timezone: string;
+    telegram: string;
+    website: string;
+    contact: string;
+    emojiStatus: string;
+  };
+  notepad: string;
+  room: {
+    boardBackdrop: string;
+    headerTint: string;
+    cursorStyle: string;
+    wallpaperOpacity: number;
+    profileAccent: string;
+  };
+  notifications: {
+    retroEnded: boolean;
+    weeklyDigest: boolean;
+    productUpdates: boolean;
+  };
+};
+
+export type CloudProfilePatchDto = {
+  identity?: Partial<CloudProfileV1Dto["identity"]>;
+  notepad?: string;
+  room?: Partial<CloudProfileV1Dto["room"]>;
+  notifications?: Partial<CloudProfileV1Dto["notifications"]>;
+};
+
+export async function fetchAuthProfile(): Promise<{ profile: CloudProfileV1Dto | null } | null> {
+  const res = await apiFetch("/api/auth/me/profile");
+  if (res.status === 401) return null;
+  if (!res.ok) throw new Error("profile_fetch_failed");
+  return res.json() as Promise<{ profile: CloudProfileV1Dto | null }>;
+}
+
+export async function patchAuthProfile(
+  patch: CloudProfilePatchDto,
+): Promise<{ profile: CloudProfileV1Dto | null; user: AuthUserDto }> {
+  const res = await apiFetch("/api/auth/me/profile", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? res.statusText);
+  }
+  return res.json() as Promise<{ profile: CloudProfileV1Dto | null; user: AuthUserDto }>;
+}
+
 export async function forwardMessageToSaved(
   chatId: string,
   messageId: string,
