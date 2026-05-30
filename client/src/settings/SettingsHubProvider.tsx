@@ -124,9 +124,9 @@ export function SettingsHubProvider({ children }: { children: ReactNode }) {
   const open = useCallback(
     (opts?: SettingsOpenOptions) => {
       void fetchAuthMe().then(setAuthUser);
-      if (opts?.section) {
-        persistLayout({ ...layoutRef.current, section: opts.section });
-      }
+      const reclamped = clampLayout(layoutRef.current);
+      const next = opts?.section ? { ...reclamped, section: opts.section } : reclamped;
+      persistLayout(next);
       setIsOpen(true);
     },
     [persistLayout],

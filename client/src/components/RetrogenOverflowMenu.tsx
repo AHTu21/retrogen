@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { useSettingsHubOptional } from "../settings";
+import { openSettingsHub } from "../settings";
 
 export type RetrogenOverflowMenuProps = {
   isLight: boolean;
@@ -42,7 +42,6 @@ export function RetrogenOverflowMenu({
 }: RetrogenOverflowMenuProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const settingsHub = useSettingsHubOptional();
 
   const openSettings = () => {
     setOpen(false);
@@ -50,11 +49,7 @@ export function RetrogenOverflowMenu({
       onOpenSettings();
       return;
     }
-    if (settingsHub) {
-      settingsHub.open();
-      return;
-    }
-    window.location.assign("/profile#room");
+    openSettingsHub();
   };
 
   useEffect(() => {
