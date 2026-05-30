@@ -8,6 +8,7 @@ import { prisma } from "./lib/prisma.js";
 import { userCanFacilitateBySlug } from "./roomsAcl.js";
 import { sanitizeTheme } from "./lib/sanitizeTheme.js";
 import { roomAccessStatus } from "./roomAccess.js";
+import { registerAdminNotificationRoutes } from "./admin/notificationRoutes.js";
 import { registerChatRoutes } from "./chat/chatRoutes.js";
 import { notifyRetroEndedBySlug } from "./notifications/retroEndedEmail.js";
 import {
@@ -43,6 +44,7 @@ const roomUnlockPre = async (req: FastifyRequest<{ Params: { slug: string } }>, 
 
 export async function registerRoutes(app: FastifyInstance, io: Server) {
   registerAuthRoutes(app);
+  registerAdminNotificationRoutes(app);
   registerChatRoutes(app, io);
 
   app.post<{

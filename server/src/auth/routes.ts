@@ -1,5 +1,4 @@
 import type { FastifyInstance } from "fastify";
-import fs from "node:fs/promises";
 import { prisma } from "../lib/prisma.js";
 import { getJwtSecret } from "./config.js";
 import { signAccessToken, verifyAccessToken } from "./jwt.js";
@@ -10,11 +9,10 @@ import {
 } from "./profileJson.js";
 import {
   deleteProfileMediaFile,
-  findProfileMediaFile,
   MAX_PROFILE_MEDIA_BYTES,
-  mimeFromPath,
   normalizeProfileMediaMime,
   profileMediaApiPath,
+  readProfileMedia,
   saveProfileMediaFile,
   type ProfileMediaKind,
 } from "./profileMediaStorage.js";
@@ -248,10 +246,15 @@ export function registerAuthRoutes(app: FastifyInstance) {
     const kind = req.params.kind === "avatar" || req.params.kind === "wallpaper" ? req.params.kind : null;
     if (!kind) return reply.code(400).send({ error: "bad_kind" });
 
-    const filePath = await findProfileMediaFile(u.id, kind);
-    if (!filePath) return reply.code(404).send({ error: "not_found" });
+    const media = await readProfileMedia(u.id, kind);
+    if (!media) return reply.code(404).send({ error: "not_found" });
 
-    const buf = await fs.readFile(filePath);
-    return reply.type(mimeFromPath(filePath)).header("Cache-Control", "private, max-age=3600").send(buf);
+    if (media.publicUrl) {
+      return reply.redirect(media.publicUrl, 302);
+    }
+    return reply
+      .type(media.mime)
+      .header("Cache-Control", "private, max-age=3600")
+      .send(media.buffer);
   });
 }

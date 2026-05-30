@@ -105,7 +105,7 @@ export function ProfileNotificationsPanel({ d, prefs, setPrefs, authUser, onGoSe
 
         {!signedIn ? (
           <p className={`${d.noticeBanner} px-4 py-3 text-[0.875rem] ${d.rSm}`}>
-            <Link to="/login" className={d.link}>
+            <Link to="/login?returnTo=%2Fprofile" className={d.link}>
               Войдите
             </Link>
             , чтобы получать email о завершении ретро и дайджесты.
@@ -153,7 +153,7 @@ export function ProfileNotificationsPanel({ d, prefs, setPrefs, authUser, onGoSe
           <p className="font-medium text-[var(--ph-text)]">Как это работает сейчас</p>
           <p className={`mt-1 ${d.muted}`}>
             {signedIn
-              ? "Настройки сохраняются локально и синхронизируются с аккаунтом. Письмо о завершении ретро отправляется участникам комнаты (нужен SMTP на сервере); дайджест и новости — в следующих релизах."
+              ? "Настройки сохраняются локально и синхронизируются с аккаунтом. Письма отправляет сервер при настроенном SMTP (или пишет в консоль в dev): завершение ретро — сразу; еженедельный дайджест — по расписанию; новости — рассылка администратором."
               : "Переключатели сохраняются в этом браузере. После входа настройки синхронизируются с аккаунтом."}
           </p>
         </div>

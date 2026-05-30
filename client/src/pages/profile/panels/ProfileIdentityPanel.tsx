@@ -125,7 +125,7 @@ export function ProfileIdentityPanel({ d, prefs, setPrefs, authUser, onGoSection
       {!authUser ? (
         <p className={`${d.noticeBanner} px-4 py-3 text-[0.875rem] ${d.rSm}`}>
           Гостевой режим — данные только в этом браузере.{" "}
-          <Link to="/login" className={d.link}>
+            <Link to="/login?returnTo=%2Fprofile" className={d.link}>
             Войдите
           </Link>
           , чтобы синхронизировать профиль между устройствами.

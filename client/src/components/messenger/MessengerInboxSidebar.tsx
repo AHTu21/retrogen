@@ -13,6 +13,7 @@ import { getMessengerModalPortalRoot } from "../../lib/messengerModalPortal";
 import { applyProfileAvatarFile, profileAvatarErrorMessage } from "../../lib/profileAvatarUpload";
 import { profileHasAvatar } from "../../lib/profileMediaCache";
 import { pushLocalProfileToCloud } from "../../lib/profileCloudSync";
+import { pullProfileCloudIfIdle } from "../../lib/pullProfileCloudIfIdle";
 import { MessengerModalBackdrop } from "./MessengerModalBackdrop";
 import {
   avatarShapeClass,
@@ -141,6 +142,7 @@ export function MessengerInboxSidebar({
       const next = cur === id ? null : id;
       if (next === "profile") {
         profile.reload();
+        void pullProfileCloudIfIdle(me, false).then(() => profile.reload());
       } else if (cur === "profile") {
         profile.discard();
       }

@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
@@ -11,8 +11,10 @@ import { WorkshopPage } from "./pages/WorkshopPage";
 import { MessagesPage } from "./pages/MessagesPage";
 
 export default function App() {
+  const location = useLocation();
+
   return (
-    <Routes>
+    <Routes location={location} key={`${location.pathname}${location.search}`}>
       <Route path="/" element={<WelcomePage />} />
       <Route path="/home" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
