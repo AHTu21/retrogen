@@ -96,11 +96,17 @@ components/room/           — UI комнаты, связанный с проф
 - Мессенджер: `useProfileMediaDisplay`, upload через `/api/auth/me/profile/media`, `pushLocalProfileToCloud` после commit
 - `/profile` и мессенджер используют один путь для аватара
 
+### Фаза G — Email notifications (MVP) ✅
+
+- `notifyRetroEndedBySlug` после `POST /api/rooms/:slug/end` — участники `RoomMember` с `retroEnded: true`
+- `server/src/email/mailer.ts` — SMTP через `RETROGEN_SMTP_*` или лог в консоль без SMTP
+- Адрес: `profileEmail` из облака → email аккаунта
+
 ### Дальше
 
 | Задача | Приоритет |
 |--------|-----------|
-| Серверная email-рассылка по `prefs.notifications` | высокий |
+| Еженедельный дайджест и новости продукта | средний |
 | S3/CDN вместо `data/profile-media/` | средний |
 | Pull cloud при открытии панели мессенджера (без затирания черновика) | низкий |
 
