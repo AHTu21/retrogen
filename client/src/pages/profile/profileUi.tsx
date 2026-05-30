@@ -38,9 +38,22 @@ export function ProfileSectionFrame({
   const lead = meta.hint ?? meta.lockReason;
   return (
     <div className={compact ? "flex min-h-0 w-full flex-1 flex-col" : "min-w-0 w-full max-w-full overflow-x-clip"}>
-      <header className={compact ? "mb-4 shrink-0 border-b border-[var(--ph-separator)] pb-4" : "mb-6 border-b border-[var(--ph-separator)] pb-5"}>
-        <h1 className={d.pageTitle}>{meta.label}</h1>
-        {lead && !compact ? <p className={d.pageLead}>{lead}</p> : null}
+      <header
+        className={
+          compact
+            ? "mb-3 shrink-0 border-b border-[var(--ph-separator)] pb-3"
+            : "mb-5 border-b border-[var(--ph-separator)] pb-4"
+        }
+      >
+        <div className="min-w-0">
+          <h1 className={compact ? "text-[1.375rem] font-semibold tracking-[-0.03em] text-[var(--ph-text)] sm:text-[1.5rem]" : d.pageTitle}>
+            {meta.label}
+          </h1>
+          {lead && !compact ? <p className={d.pageLead}>{lead}</p> : null}
+          {lead && compact ? (
+            <p className={`mt-1 line-clamp-2 text-[0.75rem] leading-snug ${d.muted}`}>{lead}</p>
+          ) : null}
+        </div>
       </header>
       {compact ? (
         <div className="flex min-h-0 w-full flex-1 flex-col">{children}</div>

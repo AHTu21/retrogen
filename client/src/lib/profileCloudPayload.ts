@@ -1,3 +1,4 @@
+import { notepadPlainText } from "./profileNotepadContent";
 import type { UserProfilePrefs } from "./profilePrefs";
 import { normalizeProfileNotifications } from "./profileNotificationPrefs";
 import { normalizeWallpaperOpacity } from "./profilePrefs";
@@ -168,7 +169,7 @@ export function cloudProfileHasContent(p: CloudProfileV1): boolean {
     id.roleTitle ||
     id.teamName ||
     id.emojiStatus ||
-    p.notepad.trim() ||
+    notepadPlainText(p.notepad).trim() ||
     p.room.boardBackdrop ||
     p.room.headerTint ||
     p.media.avatarPath ||
