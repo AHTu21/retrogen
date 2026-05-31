@@ -20,6 +20,7 @@ import {
   logoutAccount,
   patchRoomAccess,
   patchPlaneState,
+  uploadPlaneImage,
   resetRoom,
   toggleCardReaction,
   updateCard,
@@ -28,7 +29,7 @@ import {
   voteSprintStarEntry,
   type AuthUserDto,
 } from "../api";
-import type { BoardGadgetDto, PlaneShapeDto, PlaneStateDto, RoomDto } from "../types";
+import type { BoardGadgetDto, MemeCropDto, PlaneShapeDto, PlaneStateDto, RoomDto } from "../types";
 import { BOARD_SCHEME_PRESETS, BOARD_STICKER_TEMPLATES } from "../lib/boardTemplates";
 import { maxLayerZ, minLayerZ } from "../lib/layerZ";
 import {
@@ -80,10 +81,28 @@ import { boardPointFromClient, boardViewportCenterWorld, worldSizeFromCssPixels 
 import { tryEmitPlaneLivePreview } from "../lib/planeLivePreview";
 import {
   collectRoomParticipantNames,
+  GADGET_DEFAULT_SIZE,
   normalizeGadgetList,
   pickRandomParticipantName,
 } from "../lib/planeGadgets";
+import { normalizeEmbedUrl } from "../lib/planeEmbedAllowlist";
 import { PlaneGadgetLayer } from "../components/plane/PlaneGadgetLayer";
+import { PlaneGadgetMenu } from "../components/plane/PlaneGadgetMenu";
+import {
+  loadSnapToGridEnabled,
+  saveSnapToGridEnabled,
+  snapPlaneCoord,
+} from "../lib/planeGrid";
+import {
+  alignMemes,
+  createMemeFromSrc,
+  isDataUrl,
+  migrateMemesDataUrls,
+  normalizeMemeCrop,
+} from "../lib/planeMemeUtils";
+import { MemeCropModal } from "../components/plane/MemeCropModal";
+import { MemeImageView } from "../components/plane/MemeImageView";
+import type { MemeAlignMode } from "../lib/planeMemeUtils";
 import { createAppSocket } from "../lib/socketClient";
 import { getRoomUnlockToken } from "../lib/roomUnlockStorage";
 import { recordRoomVisit } from "../lib/roomLobbyPrefs";
@@ -127,6 +146,7 @@ type MemeItem = {
   height: number;
   caption?: string;
   rotation?: number;
+  crop?: MemeCropDto;
 };
 
 type MemeDragState = {
@@ -180,10 +200,13 @@ type BoardViewSnapshot = {
 
 type GadgetDragState = {
   gadgetId: string;
+  mode: "move" | "resize";
   startX: number;
   startY: number;
   startLeft: number;
   startTop: number;
+  startWidth: number;
+  startHeight: number;
 };
 
 type ShapeDragState = {
@@ -224,6 +247,7 @@ function normalizeMemeEntry(raw: unknown): MemeItem | null {
     height: Math.max(40, h),
     caption: typeof m.caption === "string" ? m.caption : undefined,
     rotation: rot,
+    crop: normalizeMemeCrop(m.crop),
   };
 }
 
@@ -516,6 +540,8 @@ export function RoomPage() {
   const [participantKey, setParticipantKey] = useState("");
   const [memes, setMemes] = useState<MemeItem[]>([]);
   const [gadgets, setGadgets] = useState<BoardGadgetDto[]>([]);
+  const [snapToGrid, setSnapToGrid] = useState(loadSnapToGridEnabled);
+  const snapToGridRef = useRef(snapToGrid);
   const [planeShapes, setPlaneShapes] = useState<PlaneShapeDto[]>([]);
   const [cardStyles, setCardStyles] = useState<Record<string, { backgroundColor?: string }>>({});
   const [blockStyles, setBlockStyles] = useState<Record<string, { backgroundColor?: string }>>({});
@@ -523,6 +549,8 @@ export function RoomPage() {
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [planeToolsOpen, setPlaneToolsOpen] = useState(false);
   const [selectedMemeId, setSelectedMemeId] = useState<string | null>(null);
+  const [selectedMemeIds, setSelectedMemeIds] = useState<string[]>([]);
+  const [memeCropTargetId, setMemeCropTargetId] = useState<string | null>(null);
   const [selectedGadgetId, setSelectedGadgetId] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [boardScale, setBoardScale] = useState(DEFAULT_BOARD_SCALE);
@@ -796,6 +824,7 @@ export function RoomPage() {
   slugRef.current = slug;
   memesRef.current = memes;
   gadgetsRef.current = gadgets;
+  snapToGridRef.current = snapToGrid;
   planeShapesRef.current = planeShapes;
   boardScaleRef.current = boardScale;
 
@@ -1336,6 +1365,16 @@ export function RoomPage() {
           if (rmNow.cards.some((c) => c.id.startsWith("tmp-"))) return;
           if (planeSnapshotHasTmpKeys(planeSnapshotRef.current)) return;
 
+          if (attempt === 0 && payload.memes.some((m) => isDataUrl(m.src))) {
+            const migrated = await migrateMemesDataUrls(slugAtSchedule, payload.memes, uploadPlaneImage);
+            const changed = migrated.some((m, i) => m.src !== payload.memes[i]?.src);
+            if (changed) {
+              payload = { ...payload, memes: migrated };
+              setMemes(migrated as MemeItem[]);
+              syncPlaneSnapshotFromDto(payload);
+            }
+          }
+
           payload = sanitizePlanePayloadForApi(rmNow, payload);
 
           if (attempt === 0) {
@@ -1652,23 +1691,35 @@ export function RoomPage() {
         const file = item.getAsFile();
         if (!file) continue;
         event.preventDefault();
-        const reader = new FileReader();
-        reader.onload = () => {
-          const src = typeof reader.result === "string" ? reader.result : "";
+        void (async () => {
+          const slugNow = slugRef.current;
+          let src = "";
+          if (slugNow) {
+            try {
+              const uploaded = await uploadPlaneImage(slugNow, file);
+              src = uploaded.url;
+            } catch {
+              /* fallback */
+            }
+          }
+          if (!src) {
+            src = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+              reader.readAsDataURL(file);
+            });
+          }
           if (!src) return;
-          const id = `meme-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
           const snap = planeSnapshotRef.current;
           const pt =
             lastBoardPointerWorldRef.current ??
             boardViewportCenterWorld(boardViewportRef.current, snap.boardOffset, snap.boardScale);
           const { width, height } = worldSizeFromCssPixels(260, 180, snap.boardScale);
-          setMemes((prev) => [
-            ...prev,
-            { id, src, x: Math.max(0, pt.x - width / 2), y: Math.max(0, pt.y - height / 2), width, height },
-          ]);
-          setSelectedMemeId(id);
-        };
-        reader.readAsDataURL(file);
+          const meme = createMemeFromSrc(src, pt, { width, height }, snapToGridRef.current, snapPlaneCoord);
+          setMemes((prev) => [...prev, meme as MemeItem]);
+          setSelectedMemeId(meme.id);
+          setSelectedMemeIds([meme.id]);
+        })();
         break;
       }
     };
@@ -1680,8 +1731,9 @@ export function RoomPage() {
     const onMouseMove = (event: MouseEvent) => {
       const drag = memeDragRef.current;
       if (!drag) return;
-      const dx = event.clientX - drag.startX;
-      const dy = event.clientY - drag.startY;
+      const sc = boardScaleRef.current || 1;
+      const dx = (event.clientX - drag.startX) / sc;
+      const dy = (event.clientY - drag.startY) / sc;
       const prevList = memesRef.current;
       const cur = prevList.find((m) => m.id === drag.memeId);
       if (!cur) return;
@@ -1700,6 +1752,16 @@ export function RoomPage() {
     };
     const onMouseUp = () => {
       if (memeDragRef.current) {
+        if (snapToGridRef.current) {
+          const memeId = memeDragRef.current.memeId;
+          setMemes((prev) =>
+            prev.map((m) =>
+              m.id !== memeId
+                ? m
+                : { ...m, x: snapPlaneCoord(m.x, true), y: snapPlaneCoord(m.y, true) },
+            ),
+          );
+        }
         planeDragEndedFlushRef.current = true;
         setPlaneSaveBump((n) => n + 1);
       }
@@ -1717,12 +1779,20 @@ export function RoomPage() {
     const onMouseMove = (event: MouseEvent) => {
       const drag = gadgetDragRef.current;
       if (!drag) return;
-      const dx = (event.clientX - drag.startX) / boardScale;
-      const dy = (event.clientY - drag.startY) / boardScale;
+      const sc = boardScaleRef.current || 1;
+      const dx = (event.clientX - drag.startX) / sc;
+      const dy = (event.clientY - drag.startY) / sc;
       const prevList = gadgetsRef.current;
       const cur = prevList.find((g) => g.id === drag.gadgetId);
       if (!cur) return;
-      const next = { ...cur, x: Math.max(8, drag.startLeft + dx), y: Math.max(8, drag.startTop + dy) };
+      const next =
+        drag.mode === "move"
+          ? { ...cur, x: Math.max(8, drag.startLeft + dx), y: Math.max(8, drag.startTop + dy) }
+          : {
+              ...cur,
+              width: Math.max(80, drag.startWidth + dx),
+              height: Math.max(48, drag.startHeight + dy),
+            };
       setGadgets((prev) => prev.map((g) => (g.id !== drag.gadgetId ? g : next)));
       tryEmitPlaneLivePreview(
         socketRef.current,
@@ -1734,6 +1804,16 @@ export function RoomPage() {
     };
     const onMouseUp = () => {
       if (gadgetDragRef.current) {
+        if (snapToGridRef.current) {
+          const gadgetId = gadgetDragRef.current.gadgetId;
+          setGadgets((prev) =>
+            prev.map((g) =>
+              g.id !== gadgetId
+                ? g
+                : { ...g, x: snapPlaneCoord(g.x, true), y: snapPlaneCoord(g.y, true) },
+            ),
+          );
+        }
         planeDragEndedFlushRef.current = true;
         setPlaneSaveBump((n) => n + 1);
       }
@@ -2192,6 +2272,8 @@ export function RoomPage() {
     event.preventDefault();
     event.stopPropagation();
     setSelectedMemeId(meme.id);
+    setSelectedGadgetId(null);
+    setSelectedShapeId(null);
     memeDragRef.current = {
       memeId: meme.id,
       mode,
@@ -2209,18 +2291,60 @@ export function RoomPage() {
     setSelectedMemeId((prev) => (prev === memeId ? null : prev));
   }
 
+  function selectMeme(id: string, shiftKey: boolean) {
+    if (shiftKey) {
+      setSelectedMemeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    } else {
+      setSelectedMemeIds([id]);
+    }
+    setSelectedMemeId(id);
+    setSelectedGadgetId(null);
+    setSelectedShapeId(null);
+  }
+
+  function alignSelectedMemes(mode: MemeAlignMode) {
+    if (selectedMemeIds.length < 2) return;
+    setMemes((prev) => alignMemes(prev, selectedMemeIds, mode) as MemeItem[]);
+    planeDragEndedFlushRef.current = true;
+    setPlaneSaveBump((n) => n + 1);
+  }
+
   function beginGadgetDrag(event: React.MouseEvent, g: BoardGadgetDto) {
     if (boardFrozen) return;
     event.preventDefault();
     event.stopPropagation();
     setSelectedGadgetId(g.id);
     setSelectedShapeId(null);
+    setSelectedMemeId(null);
+    setSelectedMemeIds([]);
+    const size = GADGET_DEFAULT_SIZE[g.kind];
     gadgetDragRef.current = {
       gadgetId: g.id,
+      mode: "move",
       startX: event.clientX,
       startY: event.clientY,
       startLeft: g.x,
       startTop: g.y,
+      startWidth: g.width ?? size.width,
+      startHeight: g.height ?? size.height,
+    };
+  }
+
+  function beginGadgetResize(event: React.MouseEvent, g: BoardGadgetDto) {
+    if (boardFrozen) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedGadgetId(g.id);
+    const size = GADGET_DEFAULT_SIZE[g.kind];
+    gadgetDragRef.current = {
+      gadgetId: g.id,
+      mode: "resize",
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: g.x,
+      startTop: g.y,
+      startWidth: g.width ?? size.width,
+      startHeight: g.height ?? size.height,
     };
   }
 
@@ -2267,6 +2391,7 @@ export function RoomPage() {
           gadgets: prev,
           shapes: planeSnapshotRef.current.planeShapes,
         }) + 1;
+      const def = GADGET_DEFAULT_SIZE.timer;
       return [
         ...prev,
         {
@@ -2274,6 +2399,8 @@ export function RoomPage() {
           kind: "timer",
           x: Math.max(8, pt.x),
           y: Math.max(8, pt.y),
+          width: def.width,
+          height: def.height,
           endsAtMs: Date.now() + Math.round(m * 60_000),
           layerZ,
         },
@@ -2281,15 +2408,54 @@ export function RoomPage() {
     });
     setSelectedGadgetId(id);
     setSelectedMemeId(null);
+    setSelectedMemeIds([]);
   }
 
   function addBoardRandomPickGadget() {
     if (boardFrozen || !room) return;
-    const id = `random-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    placeNewGadget("randomPick", {});
+  }
+
+  function addBoardPollGadget() {
+    if (boardFrozen) return;
+    const question = window.prompt("Вопрос опроса:", "Что улучшить на следующем ретро?");
+    if (question == null || !question.trim()) return;
+    const o1 = window.prompt("Вариант 1:", "Процесс") ?? "";
+    const o2 = window.prompt("Вариант 2:", "Коммуникация") ?? "";
+    const o3raw = window.prompt("Вариант 3 (необязательно, Enter — пропустить):", "");
+    const opts = [o1, o2, o3raw?.trim()].filter(Boolean) as string[];
+    if (opts.length < 2) {
+      window.alert("Нужно минимум два непустых варианта.");
+      return;
+    }
+    placeNewGadget("poll", {
+      question: question.trim(),
+      options: opts.length >= 3 ? [opts[0]!, opts[1]!, opts[2]!] : [opts[0]!, opts[1]!],
+    });
+  }
+
+  function addBoardEmbedGadget() {
+    if (boardFrozen) return;
+    const raw = window.prompt("HTTPS URL для embed (YouTube, Figma, Vimeo…):", "https://");
+    if (raw == null) return;
+    const url = normalizeEmbedUrl(raw);
+    if (!url) {
+      window.alert("URL не в allowlist или не HTTPS. Добавьте домен в VITE_PLANE_EMBED_ALLOWLIST.");
+      return;
+    }
+    placeNewGadget("embed", { url });
+  }
+
+  function placeNewGadget(
+    kind: BoardGadgetDto["kind"],
+    extra: Partial<BoardGadgetDto>,
+  ) {
+    const id = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const snap = planeSnapshotRef.current;
     const pt =
       lastBoardPointerWorldRef.current ??
       boardViewportCenterWorld(boardViewportRef.current, snap.boardOffset, snap.boardScale);
+    const def = GADGET_DEFAULT_SIZE[kind];
     setGadgets((prev) => {
       const layerZ =
         maxLayerZ({
@@ -2302,20 +2468,37 @@ export function RoomPage() {
         ...prev,
         {
           id,
-          kind: "randomPick",
+          kind,
           x: Math.max(8, pt.x),
           y: Math.max(8, pt.y),
+          width: def.width,
+          height: def.height,
           layerZ,
-        },
+          ...extra,
+        } as BoardGadgetDto,
       ];
     });
     setSelectedGadgetId(id);
     setSelectedMemeId(null);
+    setSelectedMemeIds([]);
+  }
+
+  function runPollVote(gadgetId: string, optionIndex: number) {
+    if (boardFrozen || !participantKey) return;
+    setGadgets((prev) =>
+      prev.map((g) =>
+        g.id !== gadgetId || g.kind !== "poll"
+          ? g
+          : { ...g, votes: { ...(g.votes ?? {}), [participantKey]: optionIndex } },
+      ),
+    );
+    planeDragEndedFlushRef.current = true;
+    setPlaneSaveBump((n) => n + 1);
   }
 
   function runRandomPickGadget(gadgetId: string) {
     if (boardFrozen || !room) return;
-    const names = collectRoomParticipantNames(room.cards, guestName);
+    const names = collectRoomParticipantNames(room.cards, roomActor.name);
     const picked = pickRandomParticipantName(names);
     if (!picked) {
       window.alert("Нет имён участников: добавьте стикеры с авторами или укажите имя гостя.");
@@ -2667,24 +2850,37 @@ export function RoomPage() {
     setPendingStickerPlacement(true);
   }
 
-  function onSelectImageFile(event: ChangeEvent<HTMLInputElement>) {
+  async function onSelectImageFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const src = typeof reader.result === "string" ? reader.result : "";
-      if (!src) return;
-      const id = `meme-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const snap = planeSnapshotRef.current;
-      const pt =
-        lastBoardPointerWorldRef.current ??
-        boardViewportCenterWorld(boardViewportRef.current, snap.boardOffset, snap.boardScale);
-      const { width, height } = worldSizeFromCssPixels(260, 180, snap.boardScale);
-      setMemes((prev) => [...prev, { id, src, x: Math.max(0, pt.x - width / 2), y: Math.max(0, pt.y - height / 2), width, height }]);
-      setSelectedMemeId(id);
-      if (imageInputRef.current) imageInputRef.current.value = "";
-    };
-    reader.readAsDataURL(file);
+    let src = "";
+    if (slug) {
+      try {
+        const uploaded = await uploadPlaneImage(slug, file);
+        src = uploaded.url;
+      } catch {
+        /* fallback below */
+      }
+    }
+    if (!src) {
+      src = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+    }
+    if (!src) return;
+    const snap = planeSnapshotRef.current;
+    const pt =
+      lastBoardPointerWorldRef.current ??
+      boardViewportCenterWorld(boardViewportRef.current, snap.boardOffset, snap.boardScale);
+    const { width, height } = worldSizeFromCssPixels(260, 180, snap.boardScale);
+    const meme = createMemeFromSrc(src, pt, { width, height }, snapToGrid, snapPlaneCoord);
+    setMemes((prev) => [...prev, meme as MemeItem]);
+    setSelectedMemeId(meme.id);
+    setSelectedMemeIds([meme.id]);
+    if (imageInputRef.current) imageInputRef.current.value = "";
   }
 
   function formatSticker(cardId: string, command: string, value?: string) {
@@ -4159,98 +4355,6 @@ export function RoomPage() {
           aria-hidden
         />
       ) : null}
-      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-        {memes.map((meme) => {
-          const isSelected = selectedMemeId === meme.id;
-          const rot = meme.rotation ?? 0;
-          return (
-            <div
-              key={meme.id}
-              className="pointer-events-auto absolute flex flex-col"
-              style={{ left: meme.x, top: meme.y, width: meme.width }}
-              onMouseDown={(e) => beginMemeDrag(e, meme, "move")}
-            >
-              <div className="relative" style={{ height: meme.height }}>
-                <img
-                  src={meme.src}
-                  alt="meme"
-                  draggable={false}
-                  style={{ transform: `rotate(${rot}deg)` }}
-                  className={`h-full w-full object-contain ${
-                    isSelected ? "ring-2 ring-sky-500 ring-offset-2 ring-offset-transparent" : ""
-                  }`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedMemeId(meme.id);
-                    setSelectedGadgetId(null);
-                    setSelectedShapeId(null);
-                  }}
-                />
-                {isSelected && (
-                  <>
-                    <button
-                      type="button"
-                      className="absolute -right-2 -top-2 rounded bg-rose-600 px-1.5 py-0.5 text-[11px] text-white"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeMeme(meme.id);
-                      }}
-                      title="Удалить мем"
-                    >
-                      ✕
-                    </button>
-                    <button
-                      type="button"
-                      className="absolute -left-2 -top-2 rounded bg-zinc-700 px-1.5 py-0.5 text-[11px] text-white"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setMemes((prev) =>
-                          prev.map((m) =>
-                            m.id !== meme.id
-                              ? m
-                              : { ...m, rotation: ((((m.rotation ?? 0) + 90) % 360) + 360) % 360 },
-                          ),
-                        );
-                      }}
-                      title="Повернуть на 90°"
-                    >
-                      ↻
-                    </button>
-                    <button
-                      type="button"
-                      className="absolute bottom-0 right-0 h-4 w-4 cursor-se-resize rounded bg-sky-600"
-                      onMouseDown={(e) => beginMemeDrag(e, meme, "resize")}
-                      title="Изменить размер"
-                    />
-                  </>
-                )}
-              </div>
-              {!isSelected && meme.caption ? (
-                <div
-                  className={`pointer-events-none mt-1 max-w-[280px] text-center text-[11px] leading-tight ${isLight ? "text-zinc-700" : "text-zinc-200"}`}
-                >
-                  {meme.caption}
-                </div>
-              ) : null}
-              {isSelected && (
-                <input
-                  type="text"
-                  placeholder="Подпись к картинке"
-                  maxLength={200}
-                  className={`mt-1 w-full rounded border px-1 py-0.5 text-[11px] ${isLight ? "border-zinc-300 bg-white" : "border-zinc-600 bg-zinc-900 text-white"}`}
-                  value={meme.caption ?? ""}
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setMemes((prev) => prev.map((m) => (m.id === meme.id ? { ...m, caption: v } : m)));
-                  }}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
       <header
         className={`relative z-30 shrink-0 border-b px-6 py-4 backdrop-blur ${
           isLight ? "border-zinc-300 bg-white/70" : "border-white/10 bg-black/20"
@@ -5449,33 +5553,68 @@ export function RoomPage() {
               <circle cx="9" cy="8" r="1" fill="currentColor" stroke="none" />
             </svg>
           </button>
+          <PlaneGadgetMenu
+            isLight={isLight}
+            boardFrozen={boardFrozen}
+            onAddTimer={addBoardTimerGadget}
+            onAddRandomPick={addBoardRandomPickGadget}
+            onAddPoll={addBoardPollGadget}
+            onAddEmbed={addBoardEmbedGadget}
+          />
           <button
             type="button"
             data-toolbar-action="true"
-            className={`flex h-11 w-11 items-center justify-center rounded ${
-              isLight ? "bg-zinc-100 hover:bg-zinc-200" : "bg-zinc-800 hover:bg-zinc-700"
+            className={`flex h-11 w-11 items-center justify-center rounded font-mono text-sm ${
+              snapToGrid
+                ? isLight
+                  ? "bg-sky-200 ring-2 ring-sky-500"
+                  : "bg-sky-900/70 ring-2 ring-sky-400"
+                : isLight
+                  ? "bg-zinc-100 hover:bg-zinc-200"
+                  : "bg-zinc-800 hover:bg-zinc-700"
             }`}
-            onClick={() => addBoardTimerGadget()}
-            title="Таймер на доске (синхронизируется через плоскость)"
-            aria-label="Таймер на доске"
+            onClick={() => {
+              setSnapToGrid((prev) => {
+                const next = !prev;
+                saveSnapToGridEnabled(next);
+                return next;
+              });
+            }}
+            title="Привязка к сетке 16px (картинки и гаджеты при отпускании)"
+            aria-label="Привязка к сетке"
+            aria-pressed={snapToGrid}
           >
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 7v6l4 2" strokeLinecap="round" />
-            </svg>
+            ⊞
           </button>
-          <button
-            type="button"
-            data-toolbar-action="true"
-            className={`flex h-11 w-11 items-center justify-center rounded text-lg ${
-              isLight ? "bg-zinc-100 hover:bg-zinc-200" : "bg-zinc-800 hover:bg-zinc-700"
-            }`}
-            onClick={() => addBoardRandomPickGadget()}
-            title="Случайный участник (гаджет на плоскости)"
-            aria-label="Случайный участник"
-          >
-            🎲
-          </button>
+          {selectedMemeIds.length >= 2 ? (
+            <div
+              className={`flex flex-col gap-1 rounded border p-1 text-[10px] ${
+                isLight ? "border-zinc-300 bg-white" : "border-zinc-600 bg-zinc-900"
+              }`}
+              title="Shift+клик — выбрать несколько картинок"
+            >
+              {(
+                [
+                  ["left", "←"],
+                  ["center", "↔"],
+                  ["right", "→"],
+                  ["top", "↑"],
+                  ["middle", "↕"],
+                  ["bottom", "↓"],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={`rounded px-1 py-0.5 ${isLight ? "hover:bg-zinc-100" : "hover:bg-zinc-800"}`}
+                  onClick={() => alignSelectedMemes(mode)}
+                  title={`Выровнять: ${mode}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <button
             type="button"
             data-toolbar-action="true"
@@ -5675,6 +5814,113 @@ export function RoomPage() {
           />
             );
           })()}
+        {memes.map((meme) => {
+          const isSelected = selectedMemeIds.includes(meme.id);
+          const rot = meme.rotation ?? 0;
+          return (
+            <div
+              key={meme.id}
+              data-plane-meme="true"
+              className="absolute flex flex-col"
+              style={{
+                left: meme.x,
+                top: meme.y,
+                width: meme.width,
+                zIndex: 280,
+                pointerEvents: boardFrozen ? "none" : "auto",
+              }}
+              onMouseDown={(e) => beginMemeDrag(e, meme, "move")}
+            >
+              <div className="relative" style={{ height: meme.height }}>
+                <MemeImageView
+                  src={meme.src}
+                  width={meme.width}
+                  height={meme.height}
+                  rotation={rot}
+                  crop={meme.crop}
+                  selected={isSelected}
+                  className="h-full w-full"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    selectMeme(meme.id, e.shiftKey);
+                  }}
+                />
+                {isSelected && !boardFrozen ? (
+                  <>
+                    <button
+                      type="button"
+                      className="absolute -right-2 -top-2 rounded bg-rose-600 px-1.5 py-0.5 text-[11px] text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeMeme(meme.id);
+                        setSelectedMemeIds((prev) => prev.filter((id) => id !== meme.id));
+                      }}
+                      title="Удалить картинку"
+                    >
+                      ✕
+                    </button>
+                    <button
+                      type="button"
+                      className="absolute -left-2 -top-2 rounded bg-zinc-700 px-1.5 py-0.5 text-[11px] text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMemes((prev) =>
+                          prev.map((m) =>
+                            m.id !== meme.id
+                              ? m
+                              : { ...m, rotation: ((((m.rotation ?? 0) + 90) % 360) + 360) % 360 },
+                          ),
+                        );
+                      }}
+                      title="Повернуть на 90°"
+                    >
+                      ↻
+                    </button>
+                    <button
+                      type="button"
+                      className="absolute left-1/2 -top-2 -translate-x-1/2 rounded bg-emerald-700 px-1.5 py-0.5 text-[11px] text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMemeCropTargetId(meme.id);
+                      }}
+                      title="Обрезка"
+                    >
+                      ✂
+                    </button>
+                    <button
+                      type="button"
+                      className="absolute bottom-0 right-0 h-4 w-4 cursor-se-resize rounded bg-sky-600"
+                      onMouseDown={(e) => beginMemeDrag(e, meme, "resize")}
+                      title="Изменить размер"
+                    />
+                  </>
+                ) : null}
+              </div>
+              {!isSelected && meme.caption ? (
+                <div
+                  className={`pointer-events-none mt-1 max-w-[280px] text-center text-[11px] leading-tight ${isLight ? "text-zinc-700" : "text-zinc-200"}`}
+                >
+                  {meme.caption}
+                </div>
+              ) : null}
+              {isSelected && !boardFrozen ? (
+                <input
+                  type="text"
+                  placeholder="Подпись к картинке"
+                  maxLength={200}
+                  className={`mt-1 w-full rounded border px-1 py-0.5 text-[11px] ${isLight ? "border-zinc-300 bg-white" : "border-zinc-600 bg-zinc-900 text-white"}`}
+                  value={meme.caption ?? ""}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setMemes((prev) => prev.map((m) => (m.id === meme.id ? { ...m, caption: v } : m)));
+                  }}
+                />
+              ) : null}
+            </div>
+          );
+        })}
         {planeShapesSorted.map((shape) => {
           if (shape.kind !== "frame") return null;
           const sel = selectedShapeId === shape.id;
@@ -5715,14 +5961,18 @@ export function RoomPage() {
           boardFrozen={boardFrozen}
           boardNowTs={boardNowTs}
           isLight={isLight}
+          voterKey={participantKey}
           onSelect={(id) => {
             setSelectedGadgetId(id);
             setSelectedMemeId(null);
+            setSelectedMemeIds([]);
             setSelectedShapeId(null);
           }}
           onRemove={removeGadget}
           onDragStart={beginGadgetDrag}
+          onResizeStart={beginGadgetResize}
           onRandomPick={runRandomPickGadget}
+          onPollVote={runPollVote}
         />
         {blocksSorted.map((block) => {
           const copy = themePack.blocks[block.kind];
@@ -6492,6 +6742,26 @@ export function RoomPage() {
           </div>
         </div>
       )}
+      {memeCropTargetId ? (
+        (() => {
+          const target = memes.find((m) => m.id === memeCropTargetId);
+          if (!target) return null;
+          return (
+            <MemeCropModal
+              src={target.src}
+              initialCrop={target.crop}
+              isLight={isLight}
+              onCancel={() => setMemeCropTargetId(null)}
+              onApply={(crop) => {
+                setMemes((prev) => prev.map((m) => (m.id === memeCropTargetId ? { ...m, crop } : m)));
+                setMemeCropTargetId(null);
+                planeDragEndedFlushRef.current = true;
+                setPlaneSaveBump((n) => n + 1);
+              }}
+            />
+          );
+        })()
+      ) : null}
     </div>
   );
 }

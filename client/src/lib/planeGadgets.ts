@@ -1,5 +1,20 @@
 import type { BoardGadgetDto } from "../types";
 
+export const GADGET_DEFAULT_SIZE: Record<BoardGadgetDto["kind"], { width: number; height: number }> = {
+  timer: { width: 120, height: 72 },
+  randomPick: { width: 140, height: 80 },
+  poll: { width: 220, height: 180 },
+  embed: { width: 360, height: 240 },
+};
+
+export function gadgetSize(g: BoardGadgetDto): { width: number; height: number } {
+  const def = GADGET_DEFAULT_SIZE[g.kind];
+  return {
+    width: typeof g.width === "number" && g.width >= 80 ? g.width : def.width,
+    height: typeof g.height === "number" && g.height >= 48 ? g.height : def.height,
+  };
+}
+
 export function formatGadgetCountdown(endsAtMs: number, nowMs: number): string {
   const msLeft = endsAtMs - nowMs;
   if (msLeft <= 0) return "0:00";
@@ -11,6 +26,16 @@ export function formatGadgetCountdown(endsAtMs: number, nowMs: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+function readBaseFields(o: Record<string, unknown>, layerFallback: number) {
+  const x = Number(o.x);
+  const y = Number(o.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  const layerZ = typeof o.layerZ === "number" && Number.isFinite(o.layerZ) ? o.layerZ : layerFallback;
+  const width = typeof o.width === "number" && Number.isFinite(o.width) ? o.width : undefined;
+  const height = typeof o.height === "number" && Number.isFinite(o.height) ? o.height : undefined;
+  return { x, y, layerZ, width, height };
+}
+
 export function normalizeGadgetList(raw: unknown): BoardGadgetDto[] {
   if (!Array.isArray(raw)) return [];
   const out: BoardGadgetDto[] = [];
@@ -18,11 +43,8 @@ export function normalizeGadgetList(raw: unknown): BoardGadgetDto[] {
     if (!g || typeof g !== "object") continue;
     const o = g as Record<string, unknown>;
     if (typeof o.id !== "string") continue;
-    const x = Number(o.x);
-    const y = Number(o.y);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    const layerZ =
-      typeof o.layerZ === "number" && Number.isFinite(o.layerZ) ? o.layerZ : 320 + out.length;
+    const base = readBaseFields(o, 320 + out.length);
+    if (!base) continue;
 
     if (o.kind === "timer") {
       const ends = Number(o.endsAtMs);
@@ -30,11 +52,9 @@ export function normalizeGadgetList(raw: unknown): BoardGadgetDto[] {
       out.push({
         id: o.id,
         kind: "timer",
-        x,
-        y,
+        ...base,
         endsAtMs: ends,
         label: typeof o.label === "string" ? o.label : undefined,
-        layerZ,
       });
       continue;
     }
@@ -43,11 +63,45 @@ export function normalizeGadgetList(raw: unknown): BoardGadgetDto[] {
       out.push({
         id: o.id,
         kind: "randomPick",
-        x,
-        y,
+        ...base,
         pickedName: typeof o.pickedName === "string" ? o.pickedName : undefined,
         pickedAtMs: typeof o.pickedAtMs === "number" && Number.isFinite(o.pickedAtMs) ? o.pickedAtMs : undefined,
-        layerZ,
+      });
+      continue;
+    }
+
+    if (o.kind === "poll") {
+      const question = typeof o.question === "string" ? o.question.trim() : "";
+      const optsRaw = Array.isArray(o.options) ? o.options.filter((x) => typeof x === "string" && x.trim()) : [];
+      if (!question || optsRaw.length < 2) continue;
+      const options = optsRaw.slice(0, 3) as [string, string] | [string, string, string];
+      const votes: Record<string, number> = {};
+      if (o.votes && typeof o.votes === "object") {
+        for (const [k, v] of Object.entries(o.votes as Record<string, unknown>)) {
+          const idx = Number(v);
+          if (Number.isInteger(idx) && idx >= 0 && idx < options.length) votes[k] = idx;
+        }
+      }
+      out.push({
+        id: o.id,
+        kind: "poll",
+        ...base,
+        question,
+        options,
+        votes: Object.keys(votes).length ? votes : undefined,
+      });
+      continue;
+    }
+
+    if (o.kind === "embed") {
+      const url = typeof o.url === "string" ? o.url.trim() : "";
+      if (!url.startsWith("https://")) continue;
+      out.push({
+        id: o.id,
+        kind: "embed",
+        ...base,
+        url,
+        title: typeof o.title === "string" ? o.title : undefined,
       });
     }
   }
@@ -72,4 +126,12 @@ export function collectRoomParticipantNames(
     if (n) names.add(n);
   }
   return [...names];
+}
+
+export function pollVoteCounts(gadget: Extract<BoardGadgetDto, { kind: "poll" }>): number[] {
+  const counts = gadget.options.map(() => 0);
+  for (const idx of Object.values(gadget.votes ?? {})) {
+    if (idx >= 0 && idx < counts.length) counts[idx]!++;
+  }
+  return counts;
 }

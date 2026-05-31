@@ -21,30 +21,60 @@ export type LobbyRoomDto = {
   stickerCount: number;
 };
 
-/** Таймер на плоскости. */
-export type BoardGadgetTimerDto = {
+/** Общие поля гаджета на плоскости. */
+export type BoardGadgetBaseDto = {
   id: string;
-  kind: "timer";
   x: number;
   y: number;
+  width?: number;
+  height?: number;
+  layerZ?: number;
+};
+
+/** Таймер на плоскости. */
+export type BoardGadgetTimerDto = BoardGadgetBaseDto & {
+  kind: "timer";
   /** Время окончания по `Date.now()` */
   endsAtMs: number;
   label?: string;
-  layerZ?: number;
 };
 
 /** Случайный выбор участника (имена из авторов стикеров + гость). */
-export type BoardGadgetRandomPickDto = {
-  id: string;
+export type BoardGadgetRandomPickDto = BoardGadgetBaseDto & {
   kind: "randomPick";
-  x: number;
-  y: number;
   pickedName?: string;
   pickedAtMs?: number;
-  layerZ?: number;
 };
 
-export type BoardGadgetDto = BoardGadgetTimerDto | BoardGadgetRandomPickDto;
+/** Короткий опрос (1 вопрос, 2–3 варианта). */
+export type BoardGadgetPollDto = BoardGadgetBaseDto & {
+  kind: "poll";
+  question: string;
+  options: [string, string] | [string, string, string];
+  /** voterKey → индекс варианта */
+  votes?: Record<string, number>;
+};
+
+/** Встраиваемый iframe (URL из allowlist). */
+export type BoardGadgetEmbedDto = BoardGadgetBaseDto & {
+  kind: "embed";
+  url: string;
+  title?: string;
+};
+
+export type BoardGadgetDto =
+  | BoardGadgetTimerDto
+  | BoardGadgetRandomPickDto
+  | BoardGadgetPollDto
+  | BoardGadgetEmbedDto;
+
+/** Нормализованная обрезка картинки (доли 0–1 от натурального размера). */
+export type MemeCropDto = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
 
 /** Простая фигура схемы на плоскости (рамка и далее типы). */
 export type PlaneShapeDto = {
@@ -78,6 +108,7 @@ export type PlaneStateDto = {
     caption?: string;
     /** Угол поворота изображения по часовой стрелке, градусы */
     rotation?: number;
+    crop?: MemeCropDto;
   }>;
   /** Опционально: таймеры и др.; старые снимки без поля считаются пустым списком */
   gadgets?: BoardGadgetDto[];

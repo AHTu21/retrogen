@@ -1,67 +1,56 @@
 # План: виджеты на плоскости и картинки
 
-Связь с [PLAN.md](../PLAN.md) §3 и §10. Версии: **0.12.x** (гаджеты), **0.12.x / 0.13.x** (картинки).
+Связь с [PLAN.md](../PLAN.md) §3 и §10. Версии: **0.12.x**.
 
-## Ветки
+## Ветка
 
-| Ветка | Содержание | PR |
-|-------|------------|-----|
-| `feature/plane-gadgets-framework` | Модель гаджета, каталог, random pick, рефактор таймера | → `main` |
-| `feature/plane-images-grid-storage` | Сетка, загрузка картинок на сервер | → `main` (после или параллельно) |
+| Ветка | Содержание |
+|-------|------------|
+| `feature/plane-gadgets-framework` | Гаджеты + картинки (объединённая ветка) |
 
 ---
 
 ## Эпик A — Виджеты / гаджеты (§10)
 
-### A1 — Модель (MVP) ✅ в ветке `feature/plane-gadgets-framework`
+### A1 — Модель (MVP) ✅
 
-- [x] Общий тип `BoardGadgetDto` = `timer` \| `randomPick` (discriminated union).
+- [x] Общий тип `BoardGadgetDto` = `timer` \| `randomPick` \| `poll` \| `embed`.
 - [x] `client/src/lib/planeGadgets.ts`: нормализация, фабрики, `pickRandomName`.
 - [x] `client/src/components/plane/PlaneGadgetLayer.tsx`: рендер по `kind`.
-- [x] Синхронизация в `planeState.gadgets` (как таймер сейчас).
-- [x] **randomPick**: выбор случайного участника по именам авторов стикеров + гость.
+- [x] Синхронизация в `planeState.gadgets`.
+- [x] **randomPick**: выбор случайного участника.
 
-### A2 — Следующий шаг (отложено)
+### A2 — Расширения ✅
 
-- [ ] Короткий опрос (1 вопрос, 2–3 варианта) — `kind: "poll"`.
-- [ ] Embed iframe (allowlist URL) — `kind: "embed"`, CSP.
-- [ ] Меню «Добавить гаджет» вместо отдельных кнопок на каждый тип.
-- [ ] Resize гаджетов (сейчас только drag).
-
----
-
-## Эпик B — Картинки на плоскости (§3, опционально)
-
-### B1 — Сетка и выравнивание ✅ в ветке `feature/plane-images-grid-storage`
-
-- [x] `client/src/lib/planeGrid.ts`: шаг 16px, `snapPlaneCoord`.
-- [x] Переключатель «к сетке» в левой панели (localStorage `retrogen_plane_snap_grid`).
-- [x] При отпускании мыши после drag картинки/гаджета — snap позиции.
-
-### B2 — Хранение на сервере ✅ в той же ветке (MVP)
-
-- [x] `POST /api/rooms/:slug/plane-images` (multipart, image/*, лимит ~4 МБ).
-- [x] `GET /api/rooms/:slug/plane-images/:imageId` — отдача файла.
-- [x] В `memes[].src` — URL `/api/rooms/:slug/plane-images/:id` вместо data URL при загрузке с диска.
-- [ ] Paste из буфера: по-прежнему data URL (или сжатие + upload — позже).
-- [ ] Миграция старых data URL в файлы при сохранении плоскости — позже.
-
-### B3 — Отложено
-
-- [ ] Обрезка (crop UI).
-- [ ] Выравнивание нескольких картинок друг к другу (align left/center).
-- [ ] CDN / S3 вместо локальной папки `data/plane-images`.
+- [x] Короткий опрос (1 вопрос, 2–3 варианта) — `kind: "poll"`.
+- [x] Embed iframe (allowlist URL) — `kind: "embed"`.
+- [x] Меню «Добавить гаджет» вместо отдельных кнопок.
+- [x] Resize гаджетов (ручка в углу при выделении).
 
 ---
 
-## Порядок merge
+## Эпик B — Картинки на плоскости (§3)
+
+### B1 — Сетка ✅
+
+- [x] `planeGrid.ts`: шаг 16px, переключатель ⊞, snap при drag/вставке.
+
+### B2 — Хранение ✅
+
+- [x] `POST/GET /api/rooms/:slug/plane-images`.
+- [x] Загрузка с диска → server URL.
+- [x] Paste из буфера → upload на сервер (fallback data URL).
+- [x] Миграция старых data URL в файлы перед сохранением плоскости.
+
+### B3 — Дополнения ✅
+
+- [x] Обрезка (crop UI).
+- [x] Выравнивание нескольких картинок (shift+клик, align left/center/right/top/middle/bottom).
+- [x] S3 backend (`PLANE_IMAGE_STORAGE=s3`, `@aws-sdk/client-s3`); локальная папка по умолчанию.
+
+---
+
+## Merge и релиз
 
 1. `feature/plane-gadgets-framework` → `main`
-2. `feature/plane-images-grid-storage` → `main` (rebase на актуальный `main`)
-3. Релиз **0.12.0** — changelog user: гаджеты + сетка + картинки на сервере
-
-## Проверка
-
-- Два браузера в одной комнате: таймер, random pick, картинка с диска — видны у обоих после сохранения плоскости / live preview.
-- Без `db:migrate` для B2 (только файлы на диске).
-- `npm run dev` после pull: `predev` → `prisma generate`.
+2. Релиз **0.12.0** — changelog: гаджеты + сетка + картинки
